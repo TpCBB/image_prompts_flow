@@ -6,6 +6,8 @@ import { authorizeAdminRequest } from '@/lib/admin-auth';
 import { getCache } from '@/lib/cache';
 import { parsePositiveInteger } from '@/lib/prompt-query';
 import { runReadQuery, readErrorResponse } from '@/lib/read-guard';
+import { mapDbPromptToPrompt } from '@/lib/type-mapping';
+import type { DbPrompt } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +39,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         throw error;
       }
 
-      return { found: true as const, data };
+      return { found: true as const, data: mapDbPromptToPrompt(data as DbPrompt) };
     });
     return result.found ? successResponse(result.data) : ApiError.NOT_FOUND('提示词不存在');
   } catch (error) {

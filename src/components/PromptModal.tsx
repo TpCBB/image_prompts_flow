@@ -7,6 +7,7 @@ import { translations } from '@/lib/i18n';
 import { getImageUrl } from '@/lib/config';
 import { useClipboard, useImageLoader } from '@/hooks';
 import { isNsfwLabel } from '@/lib/content-visibility';
+import { promptShareUrl } from '@/lib/browse-state';
 
 interface PromptModalProps {
   prompt: Prompt;
@@ -24,8 +25,8 @@ const shareOptions = [
         <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
       </svg>
     ),
-    getUrl: (text: string, title: string) => 
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(`${title}\n\n${text}`)}`
+    getUrl: (url: string, title: string) =>
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`
   },
 ];
 
@@ -40,6 +41,7 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
 
   // Use custom hook for clipboard operations
   const { copy, copied } = useClipboard({ resetDelay: 2000 });
+  const { copy: copyLink, copied: linkCopied } = useClipboard({ resetDelay: 2000 });
 
   // 根据语言选择显示的标题和提示词（英文优先，没有则回退到中文）
   const displayTitle = lang === 'en' && prompt.title_en ? prompt.title_en : prompt.title;
@@ -78,7 +80,7 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
   };
 
   const handleShareTo = (option: typeof shareOptions[0]) => {
-    const url = option.getUrl(displayPrompt, displayTitle);
+    const url = option.getUrl(promptShareUrl(window.location.href, prompt.id), displayTitle);
     window.open(url, '_blank', 'noopener,noreferrer');
     setShowShareMenu(false);
   };
@@ -154,6 +156,7 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
             <h2 id={titleId} className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
               {displayTitle}
             </h2>
+            <button type="button" onClick={() => { void copyLink(promptShareUrl(window.location.href, prompt.id)); }} className="mb-3 text-sm font-medium text-blue-600 dark:text-blue-400">{linkCopied ? t.linkCopied : t.copyLink}</button>
             <div className="flex items-center justify-between">
               <span className="text-[13px] text-gray-500 dark:text-gray-400">
                 {t.author}: <span className="text-gray-700 dark:text-gray-300">{prompt.author}</span>

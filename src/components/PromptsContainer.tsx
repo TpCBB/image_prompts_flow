@@ -20,24 +20,25 @@ import type { PromptsResult } from "@/lib/data";
 import { getApiClient } from "@/lib/api-client";
 import { useToast } from "@/contexts/ToastContext";
 import { isNsfwLabel } from "@/lib/content-visibility";
+import { useBrowseState } from '@/hooks/useBrowseState';
+import { DEFAULT_BROWSE_STATE, type BrowseState } from '@/lib/browse-state';
 
 interface PromptsContainerProps {
   initialPrompts: PromptsResult;
   initialTags: Tag[];
   initialCategories: string[];
+  initialBrowseState?: BrowseState;
 }
 
 export default function PromptsContainer({
   initialPrompts,
   initialTags,
   initialCategories,
+  initialBrowseState = DEFAULT_BROWSE_STATE,
 }: PromptsContainerProps) {
-  const [lang, setLang] = useState<Language>("zh");
-  const [promptType, setPromptType] = useState<PromptType>("image");
-  const [searchQuery, setSearchQuery] = useState("");
+  const { state: browseState, update: updateBrowseState, closePrompt } = useBrowseState(initialBrowseState);
+  const { lang, promptType, search: searchQuery, category: selectedCategory, tag: selectedTag } = browseState;
   const debouncedSearch = useDebounce(searchQuery, 300).trim();
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const { addToast } = useToast();
   const apiClient = useMemo(() => getApiClient(), []);
@@ -56,6 +57,7 @@ export default function PromptsContainer({
   const requestRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
   const queryKey = JSON.stringify([promptType, debouncedSearch, selectedCategory, selectedTag]);
+  const initialQueryKey = JSON.stringify([initialBrowseState.promptType, initialBrowseState.search.trim(), initialBrowseState.category, initialBrowseState.tag]);
   const latestQueryKey = useRef(queryKey);
   latestQueryKey.current = queryKey;
 
@@ -136,7 +138,7 @@ export default function PromptsContainer({
   );
 
   useEffect(() => {
-    if (promptType === "image") {
+    if (promptType === initialBrowseState.promptType) {
       setTags(initialTags);
       setCategories(initialCategories);
       return;
@@ -166,10 +168,10 @@ export default function PromptsContainer({
     };
     void fetchFilters();
     return () => controller.abort();
-  }, [promptType, apiClient, addToast, initialTags, initialCategories]);
+  }, [promptType, apiClient, addToast, initialTags, initialCategories, initialBrowseState.promptType]);
 
   useEffect(() => {
-    if (promptType === "image" && !debouncedSearch && !selectedCategory && !selectedTag) {
+    if (queryKey === initialQueryKey) {
       setPrompts(filteredInitialPrompts);
       setTotalCount(initialPrompts.pagination.total);
       setHasMore(initialPrompts.pagination.hasMore);
@@ -184,15 +186,28 @@ export default function PromptsContainer({
       requestRef.current = null;
       requestIdRef.current += 1;
     };
-  }, [fetchPrompts, promptType, debouncedSearch, selectedCategory, selectedTag,
+  }, [fetchPrompts, queryKey, initialQueryKey,
     filteredInitialPrompts, initialPrompts.pagination]);
+
+  useEffect(() => {
+    const id = browseState.promptId;
+    if (!id) { setSelectedPrompt(null); return; }
+    const cached = prompts.find((prompt) => prompt.id === id);
+    if (cached) { setSelectedPrompt(cached); return; }
+    const controller = new AbortController();
+    setSelectedPrompt(null);
+    void apiClient.get<Prompt>(`/api/prompts/${id}`, { signal: controller.signal }).then((response) => {
+      if (controller.signal.aborted) return;
+      if (response.success && response.data) setSelectedPrompt(response.data);
+      else addToast({ type: 'error', message: messagesRef.current.detailLoadError });
+    });
+    return () => controller.abort();
+  }, [browseState.promptId, prompts, apiClient, addToast]);
 
   const handlePromptTypeChange = (nextType: PromptType) => {
     if (nextType === promptType) return;
     // Reset together so the new type is never requested with the old filters.
-    setSelectedCategory(null);
-    setSelectedTag(null);
-    setPromptType(nextType);
+    updateBrowseState({ category: null, tag: null, promptType: nextType, promptId: null });
   };
 
   const handleLoadMore = () => {
@@ -203,9 +218,9 @@ export default function PromptsContainer({
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950">
       <Header
         lang={lang}
-        onLangChange={setLang}
+        onLangChange={(lang) => updateBrowseState({ lang })}
         searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        onSearchChange={(search) => updateBrowseState({ search }, 'replace')}
         promptType={promptType}
         onPromptTypeChange={handlePromptTypeChange}
         isHidden={isHeaderHidden}
@@ -216,7 +231,7 @@ export default function PromptsContainer({
         <CategoryFilter
           categories={categories}
           selectedCategory={selectedCategory}
-          onCategorySelect={setSelectedCategory}
+          onCategorySelect={(category) => updateBrowseState({ category })}
           lang={lang}
         />
 
@@ -224,7 +239,7 @@ export default function PromptsContainer({
         <TagFilter
           tags={tags}
           selectedTag={selectedTag}
-          onTagSelect={setSelectedTag}
+          onTagSelect={(tag) => updateBrowseState({ tag })}
           lang={lang}
         />
 
@@ -233,7 +248,7 @@ export default function PromptsContainer({
           <span className="text-[13px] font-medium text-gray-500 dark:text-gray-400">
             {t.promptCount.replace("{count}", totalCount.toString())}
           </span>
-          {(searchQuery || selectedCategory || selectedTag) && <button onClick={() => { setSearchQuery(''); setSelectedCategory(null); setSelectedTag(null); }} className="text-sm font-medium text-blue-600 dark:text-blue-400 px-2 py-1">{t.clearFilters}</button>}
+          {(searchQuery || selectedCategory || selectedTag) && <button onClick={() => updateBrowseState({ search: '', category: null, tag: null })} className="text-sm font-medium text-blue-600 dark:text-blue-400 px-2 py-1">{t.clearFilters}</button>}
         </div>
 
         {/* Prompts Grid */}
@@ -254,7 +269,7 @@ export default function PromptsContainer({
                   key={prompt.id}
                   prompt={prompt}
                   lang={lang}
-                  onClick={() => setSelectedPrompt(prompt)}
+                  onClick={() => { setSelectedPrompt(prompt); updateBrowseState({ promptId: prompt.id }); }}
                 />
               ))}
             </div>
@@ -309,7 +324,7 @@ export default function PromptsContainer({
         <PromptModal
           prompt={selectedPrompt}
           lang={lang}
-          onClose={() => setSelectedPrompt(null)}
+          onClose={() => { setSelectedPrompt(null); closePrompt(); }}
         />
       )}
     </div>

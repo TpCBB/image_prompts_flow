@@ -5,6 +5,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import PromptsContainer from '@/components/PromptsContainer';
 import { Prompt, Tag, PromptType } from '@/types';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
+import type { BrowseState } from '@/lib/browse-state';
 
 interface PromptsContainerWrapperProps {
   initialPrompts: {
@@ -19,6 +20,7 @@ interface PromptsContainerWrapperProps {
   };
   initialTags: Tag[];
   initialCategories: string[];
+  initialBrowseState?: BrowseState;
 }
 
 function ErrorFallback({ onReset }: { onReset?: () => void }) {
@@ -57,6 +59,7 @@ export default function PromptsContainerWrapper({
   initialPrompts,
   initialTags,
   initialCategories,
+  initialBrowseState,
 }: PromptsContainerWrapperProps) {
   const handleError = (error: Error, errorInfo: React.ErrorInfo) => {
     // Log error for debugging/monitoring
@@ -73,6 +76,7 @@ export default function PromptsContainerWrapper({
         initialPrompts={initialPrompts}
         initialTags={initialTags}
         initialCategories={initialCategories}
+        initialBrowseState={initialBrowseState}
       />
     </ErrorBoundary>
   );

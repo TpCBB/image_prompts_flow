@@ -36,6 +36,7 @@ function mount() {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/');
   get.mockReset();
   get.mockResolvedValue({ success: true, data: [] });
 });
