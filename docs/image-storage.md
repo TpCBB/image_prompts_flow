@@ -22,6 +22,8 @@
 
 缩略图位于 `local_data/image-assets/thumbnails/v1/`，文件名含内容哈希，使用一年不可变缓存。新增或替换原图后需重新生成、提交清单，并先发布图片，再发布网站。缩略图未发布或失效时，卡片依次回退到原图和本地占位图。
 
+2026-11-10 已发布本轮缩略图，保留原图；抽样验证线上文件与本地生成内容一致，且 `Cache-Control` 包含一年缓存和 `immutable`。
+
 ```bash
 cp image-hosting/_headers local_data/image-assets/_headers
 cp image-hosting/index.html local_data/image-assets/index.html

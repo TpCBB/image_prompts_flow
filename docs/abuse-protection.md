@@ -29,7 +29,7 @@ CLI 发布时先运行 `vercel deploy --dry --json` 核对文件列表。`.verce
 
 可先用 `vercel deploy --prod --skip-domain` 创建使用生产配置的独立部署，验证页面和 API 后再 `vercel promote` 切换正式域名。新版验证通过后应用 `supabase/migrations/` 中关闭匿名读取的迁移；原始表和记录保留。
 
-完成后执行 `npm run verify:access`，使用本地匿名 / publishable key 验证网站仍能展示数据、未授权写入被拒绝、四个数据库表 / 视图的直接读取均返回权限错误。脚本拒绝服务端管理密钥。受限网络下可用 `HTTPS_PROXY=http://127.0.0.1:7891 NODE_USE_ENV_PROXY=1 npm run verify:access`。
+完成后执行 `npm run verify:access`，使用本地匿名 / publishable key 验证网站仍能展示数据、未授权写入被拒绝、四个数据库表 / 视图的直接读取均返回权限错误；随机搜索还会强制一次未缓存的数据库查询。脚本拒绝服务端管理密钥。受限网络下可用 `HTTPS_PROXY=http://127.0.0.1:7891 ACCESS_CHECK_TRANSPORT=curl npm run verify:access`，密钥只经进程标准输入传递。
 
 规则在 `src/middleware.ts` 中。Redis 使用一个原子 Lua 命令检查全部额度，实例扩容不会重置计数。Redis 故障会暂时影响可用性，这是避免故障期间无限查库的取舍。
 
@@ -40,6 +40,15 @@ CLI 发布时先运行 `vercel deploy --dry --json` 核对文件列表。`.verce
 缓存与数据库并发上限是单实例的，总访问额度在配置 Redis 后跨实例共享。管理写入后，其他实例可能继续返回最多 60 秒的旧列表/详情、最多 5 分钟的旧统计。
 
 本地运行 `npm test`、`npx tsc --noEmit`、`npm run build`。测试覆盖搜索换词、IP 处理、HEAD/预取、共享存储失败、窗口恢复、缓存请求合并和写入期间失效、数据库过载及前端不自动重试。
+
+## 2026-11-10 生产验证
+
+- 新版服务端读取已发布并切换正式域名，随后应用 `20261110154951_close_direct_public_reads.sql`，撤销原始表对 `PUBLIC`、`anon`、`authenticated` 的读取授权。
+- Upstash 使用免费方案创建，创建参数禁用自动升级；生产环境使用 Marketplace 管理的 `KV_*` 凭据。浏览器不需要数据库管理密钥。
+- 使用有效的 publishable key 直读 `prompts`、`tags`、`categories`、`gallery_prompts`，均返回 HTTP 401、PostgreSQL 权限错误 `42501`。
+- 首页、列表、分类、标签和未命中缓存的服务端查询保持成功；未授权写入返回 HTTP 403。
+- 原始记录未变：提示词 1,110 条、标签 49 条、分类 10 条；网页继续展示 1,013 条图片提示词、44 个有效标签和 9 个分类。
+- 缩略图已先行发布到独立图片服务，抽样核对内容一致，并确认一年不可变缓存生效。
 
 参考：
 

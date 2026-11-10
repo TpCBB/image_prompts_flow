@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { spawn } from 'node:child_process';
 
 const site = new URL(process.argv[2] || process.env.SITE_URL || 'https://image-prompt-flow.vercel.app');
 const database = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -13,6 +14,31 @@ if (!key.startsWith('sb_publishable_')) {
 }
 
 async function get(url, options = {}) {
+  if (process.env.ACCESS_CHECK_TRANSPORT === 'curl') {
+    return new Promise((resolve, reject) => {
+      // Header values travel over stdin, never through process arguments/logs.
+      let config = `url = ${JSON.stringify(String(url))}\n`;
+      for (const [name, value] of Object.entries(options.headers || {})) config += `header = ${JSON.stringify(`${name}: ${value}`)}\n`;
+      if (options.method) config += `request = ${JSON.stringify(options.method)}\n`;
+      if (options.body) config += `data = ${JSON.stringify(options.body)}\n`;
+      const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+      if (proxy) config += `proxy = ${JSON.stringify(proxy)}\nnoproxy = ""\n`;
+      const child = spawn('curl', ['--silent', '--show-error', '--location', '--connect-timeout', '8', '--max-time', '30', '--write-out', '\n%{http_code}', '--config', '-']);
+      const chunks = [];
+      let errorText = '';
+      child.stdout.on('data', (chunk) => chunks.push(chunk));
+      child.stderr.on('data', (chunk) => { errorText += chunk.toString(); });
+      child.on('error', reject);
+      child.on('close', (code) => {
+        if (code !== 0) { reject(new Error(`Verification request failed: ${errorText.trim()}`)); return; }
+        const output = Buffer.concat(chunks).toString();
+        const match = /\n(\d{3})$/.exec(output);
+        if (!match) { reject(new Error('Missing HTTP status')); return; }
+        resolve(new Response(output.slice(0, match.index), { status: Number(match[1]) }));
+      });
+      child.stdin.end(config);
+    });
+  }
   return fetch(url, { ...options, signal: AbortSignal.timeout(25_000), cache: 'no-store' });
 }
 
