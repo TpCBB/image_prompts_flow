@@ -5,6 +5,9 @@ export interface Prompt {
   title: string;
   title_en?: string | null;
   preview?: string | null;
+  preview_width?: number;
+  preview_height?: number;
+  preview_variants?: { path: string; width: number }[];
   prompt: string;
   prompt_en?: string | null;
   description?: string | null;

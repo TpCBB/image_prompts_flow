@@ -21,6 +21,17 @@ class MockImage {
 }
 
 describe('useImageLoader', () => {
+  it('falls back from a missing thumbnail to the original, then the placeholder', () => {
+    const { result } = renderHook(() => useImageLoader({
+      src: '/thumbnail.webp', fallbackSources: ['/original.png', '/placeholder.svg'],
+    }));
+    act(() => result.current.onError());
+    expect(result.current.imageSrc).toBe('/original.png');
+    act(() => result.current.onError());
+    expect(result.current.imageSrc).toBe('/placeholder.svg');
+    act(() => result.current.onLoad());
+    expect(result.current.isLoaded).toBe(true);
+  });
   let originalImage: typeof Image;
 
   beforeEach(() => {

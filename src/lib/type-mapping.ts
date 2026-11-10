@@ -1,10 +1,12 @@
 import { DbPrompt, Prompt, PromptType } from '@/types';
+import { getImageMetadata } from './image-metadata';
 
 /**
  * Maps a database prompt record to the frontend Prompt interface.
  * Handles null/undefined values safely and ensures type consistency.
  */
 export function mapDbPromptToPrompt(dbPrompt: DbPrompt): Prompt {
+  const image = getImageMetadata(dbPrompt.preview);
   const validModes = ['generate', 'edit'] as const;
   const validPromptTypes = ['image', 'functional'] as const;
 
@@ -21,6 +23,7 @@ export function mapDbPromptToPrompt(dbPrompt: DbPrompt): Prompt {
     title: dbPrompt.title,
     title_en: dbPrompt.title_en ?? null,
     preview: dbPrompt.preview ?? null,
+    ...(image ? { preview_width: image.width, preview_height: image.height, preview_variants: image.variants } : {}),
     prompt: dbPrompt.prompt,
     prompt_en: dbPrompt.prompt_en ?? null,
     description: dbPrompt.description ?? null,

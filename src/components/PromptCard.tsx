@@ -21,9 +21,12 @@ export default function PromptCard({ prompt, lang, onClick }: PromptCardProps) {
   const t = translations[lang];
 
   // Use custom hooks for image loading and clipboard
+  const originalSrc = prompt.preview ? getImageUrl(prompt.preview) : null;
+  const thumbnailSrc = prompt.preview_variants?.[0] ? getImageUrl(prompt.preview_variants[0].path) : originalSrc;
   const { imageSrc, isLoaded, imgRef, onLoad, onError } = useImageLoader({
-    src: prompt.preview ? getImageUrl(prompt.preview) : null,
+    src: thumbnailSrc,
     fallbackSrc: FALLBACK_IMAGE,
+    fallbackSources: originalSrc && thumbnailSrc !== originalSrc ? [originalSrc, FALLBACK_IMAGE] : [FALLBACK_IMAGE],
   });
 
   const { copy, copied } = useClipboard({ resetDelay: 2000 });
@@ -57,13 +60,17 @@ export default function PromptCard({ prompt, lang, onClick }: PromptCardProps) {
       {/* Preview Image - 使用固定 aspect-ratio 减少布局抖动 */}
       <div className="relative overflow-hidden bg-gray-100 dark:bg-gray-800">
         {/* 图片容器 - 使用最小高度和自适应 */}
-        <div className="min-h-[160px]">
+        <div className="min-h-[160px]" style={{ aspectRatio: `${prompt.preview_width || 4} / ${prompt.preview_height || 3}` }}>
           {prompt.preview ? (
             <img
               ref={imgRef}
               src={imageSrc}
+              srcSet={imageSrc === thumbnailSrc && prompt.preview_variants ? prompt.preview_variants.map((variant) => `${getImageUrl(variant.path)} ${variant.width}w`).join(', ') : undefined}
+              sizes="(min-width: 1280px) 288px, (min-width: 1024px) 31vw, (min-width: 640px) 46vw, 92vw"
+              width={prompt.preview_width || 4}
+              height={prompt.preview_height || 3}
               alt={prompt.title}
-              className={`w-full h-auto object-cover 
+              className={`w-full h-full object-cover
                          transition-opacity duration-200 ease-out
                          ${isLoaded ? "opacity-100" : "opacity-0"}`}
               loading="lazy"

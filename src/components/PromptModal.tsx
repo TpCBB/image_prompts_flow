@@ -138,6 +138,8 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
           <img
             ref={imgRef}
             src={imageSrc}
+            width={prompt.preview_width}
+            height={prompt.preview_height}
             onLoad={onLoad}
             onError={onError}
             alt={prompt.title}

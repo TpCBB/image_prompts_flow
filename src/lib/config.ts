@@ -1,6 +1,6 @@
 // 图片 CDN 域名配置
 // 修改这里来切换图片源
-export const IMAGE_BASE_URL = 'https://image-prompts-flow-images.hsc28yo.workers.dev';
+export const IMAGE_BASE_URL = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://image-prompts-flow-images.hsc28yo.workers.dev').replace(/\/$/, '');
 
 // 获取完整图片 URL
 export function getImageUrl(imagePath: string | null | undefined): string {

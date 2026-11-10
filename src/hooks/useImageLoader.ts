@@ -7,6 +7,8 @@ export interface UseImageLoaderOptions {
   src: string | null | undefined;
   /** Fallback image source when main image fails to load */
   fallbackSrc?: string;
+  /** Ordered fallbacks, e.g. thumbnail -> original -> placeholder. */
+  fallbackSources?: string[];
 }
 
 export interface UseImageLoaderReturn {
@@ -33,20 +35,21 @@ const DEFAULT_FALLBACK = '/placeholder.svg';
  * Handles loading, loaded, and error states with fallback support
  */
 export function useImageLoader(options: UseImageLoaderOptions): UseImageLoaderReturn {
-  const { src, fallbackSrc = DEFAULT_FALLBACK } = options;
+  const { src, fallbackSrc = DEFAULT_FALLBACK, fallbackSources } = options;
   
   const [isLoaded, setIsLoaded] = useState(false);
   const [isError, setIsError] = useState(false);
-  const [useFallback, setUseFallback] = useState(false);
+  const [fallbackIndex, setFallbackIndex] = useState(-1);
   const imgRef = useRef<HTMLImageElement>(null);
 
   // Determine the current image source
-  const imageSrc = useFallback || !src ? fallbackSrc : src;
+  const fallbacks = fallbackSources?.length ? fallbackSources : [fallbackSrc];
+  const imageSrc = !src ? fallbackSrc : fallbackIndex < 0 ? src : fallbacks[Math.min(fallbackIndex, fallbacks.length - 1)];
   
   // Check if image is already cached on mount
   useEffect(() => {
     if (!src) {
-      setUseFallback(true);
+      setFallbackIndex(0);
       setIsLoaded(true);
       return;
     }
@@ -54,7 +57,7 @@ export function useImageLoader(options: UseImageLoaderOptions): UseImageLoaderRe
     // Reset states when src changes
     setIsLoaded(false);
     setIsError(false);
-    setUseFallback(false);
+    setFallbackIndex(-1);
 
     // Check if image is already in browser cache
     // Inspect the rendered element: a separate Image() eagerly downloads every
@@ -74,8 +77,8 @@ export function useImageLoader(options: UseImageLoaderOptions): UseImageLoaderRe
   const onError = useCallback(() => {
     setIsError(true);
     setIsLoaded(false);
-    setUseFallback(true);
-  }, []);
+    setFallbackIndex((index) => Math.min(index + 1, fallbacks.length - 1));
+  }, [fallbacks.length]);
 
   return {
     imageSrc,

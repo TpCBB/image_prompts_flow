@@ -18,6 +18,10 @@
 
 ## 发布图片
 
+先执行 `npm run images:prepare`，从原图生成 480 / 960 像素 WebP 缩略图和 `src/lib/image-manifest.json` 尺寸清单。原图保留，详情仍使用原图；列表按屏幕宽度选择缩略图，并预留图片比例。生成工具依赖 `sharp`，只在本地准备素材时运行，不增加在线图片处理入口。
+
+缩略图位于 `local_data/image-assets/thumbnails/v1/`，文件名含内容哈希，使用一年不可变缓存。新增或替换原图后需重新生成、提交清单，并先发布图片，再发布网站。缩略图未发布或失效时，卡片依次回退到原图和本地占位图。
+
 ```bash
 cp image-hosting/_headers local_data/image-assets/_headers
 cp image-hosting/index.html local_data/image-assets/index.html
@@ -30,6 +34,6 @@ npx --yes wrangler@4.159.0 deploy --config image-hosting/wrangler.jsonc
 
 ## 切换网站
 
-图片地址配置位于 `src/lib/config.ts`。新图片服务验证完成后，再更新地址并重新部署网站。完整 URL 会保持原样；本次数据库快照中的非空图片字段均为相对路径。
+图片地址默认配置位于 `src/lib/config.ts`，可通过 `NEXT_PUBLIC_IMAGE_BASE_URL` 使用自定义域名（更改后重新构建网站）。新图片服务验证完成后再切换。完整 URL 会保持原样；第三方图片不使用本地缩略图清单。国内网络访问质量需用目标用户的实际网络验证。
 
 2026-11-10 按用户要求清空旧 R2 桶 `promptsimage` 的全部 1,051 个文件，并确认桶内已无文件。本地原始备份和 ZIP 保留。删除空桶时现有密钥返回 `AccessDenied`，需原 R2 账号的管理权限继续完成；R2 订阅和付款设置尚未更改。
