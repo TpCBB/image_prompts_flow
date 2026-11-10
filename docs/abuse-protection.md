@@ -25,6 +25,8 @@
 
 CLI 发布时先运行 `vercel deploy --dry --json` 核对文件列表。`.vercelignore` 明确排除本地环境文件、`local_data/` 备份、图片原始目录及检查输出；Vercel 的生产配置通过环境变量注入。
 
+私有仓库发布若提示提交作者无权部署，应核对 Git 作者邮箱与 Vercel 项目成员身份。发布提交使用实际账号所有者已验证的邮箱，或在平台正确关联原有身份；不要通过伪造部署元数据跳过校验。
+
 可先用 `vercel deploy --prod --skip-domain` 创建使用生产配置的独立部署，验证页面和 API 后再 `vercel promote` 切换正式域名。新版验证通过后应用 `supabase/migrations/` 中关闭匿名读取的迁移；原始表和记录保留。
 
 完成后执行 `npm run verify:access`，使用本地匿名 / publishable key 验证网站仍能展示数据、未授权写入被拒绝、四个数据库表 / 视图的直接读取均返回权限错误。脚本拒绝服务端管理密钥。受限网络下可用 `HTTPS_PROXY=http://127.0.0.1:7891 NODE_USE_ENV_PROXY=1 npm run verify:access`。
