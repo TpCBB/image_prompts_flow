@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 
 const site = new URL(process.argv[2] || process.env.SITE_URL || 'https://image-prompt-flow.vercel.app');
 const database = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -26,6 +27,15 @@ for (const path of ['/api/prompts?limit=1', '/api/categories', '/api/tags']) {
   assert(Array.isArray(body.data) && body.data.length > 0, `${path} must return actual data`);
   console.log(JSON.stringify({ check: 'website', path, status: response.status, items: body.data.length }));
 }
+
+// A unique search forces a database read after revocation, rather than proving
+// only that a response cached before the change is still available.
+const fresh = await get(new URL(`/api/prompts?search=${encodeURIComponent(`access-verification-${randomUUID()}`)}`, site));
+const freshBody = await fresh.json();
+assert.equal(fresh.status, 200, 'An uncached server-side database read must succeed');
+assert.equal(freshBody.success, true);
+assert(Array.isArray(freshBody.data));
+console.log(JSON.stringify({ check: 'uncached-server-read', status: fresh.status }));
 
 const write = await get(new URL('/api/prompts', site), { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
 assert([401, 403].includes(write.status), 'Unauthenticated writes must be rejected');
