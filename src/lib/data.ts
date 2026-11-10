@@ -5,6 +5,7 @@ import { mapDbPromptToPrompt } from './type-mapping';
 import { buildSearchFilter } from './prompt-query';
 import { queryFilterMetadata, queryTags } from './filter-data';
 import { runReadQuery } from './read-guard';
+import { getCache } from './cache';
 
 export interface FetchPromptsParams {
   search?: string;
@@ -46,7 +47,7 @@ function calculatePagination(
 }
 
 // 获取提示词列表 (服务端)
-export async function fetchPrompts(params: FetchPromptsParams = {}): Promise<PromptsResult> {
+async function loadPrompts(params: FetchPromptsParams): Promise<PromptsResult> {
   const {
     search = '',
     category = '',
@@ -58,11 +59,7 @@ export async function fetchPrompts(params: FetchPromptsParams = {}): Promise<Pro
 
   const offset = (page - 1) * limit;
 
-  const { hiddenDuplicateIds } = await queryFilterMetadata(prompt_type);
-  let query = supabase.from('prompts').select('*', { count: 'exact' });
-  if (hiddenDuplicateIds.length) {
-    query = query.not('id', 'in', `(${hiddenDuplicateIds.join(',')})`);
-  }
+  let query = supabase.from('gallery_prompts').select('*', { count: 'exact' });
 
   // Apply prompt_type filter
   query = query.eq('prompt_type', prompt_type);
@@ -84,7 +81,7 @@ export async function fetchPrompts(params: FetchPromptsParams = {}): Promise<Pro
 
   // 默认过滤 NSFW 内容
   if (params.excludeNsfw !== false) {
-    query = query.neq('category', 'NSFW');
+    query = query.eq('is_nsfw', false);
   }
 
   // Apply sorting and pagination
@@ -105,6 +102,13 @@ export async function fetchPrompts(params: FetchPromptsParams = {}): Promise<Pro
     data: mappedData,
     pagination: calculatePagination(page, limit, count || 0),
   };
+}
+
+// SSR and API reads share one query and one cache, including concurrent misses.
+export function fetchPrompts(params: FetchPromptsParams = {}): Promise<PromptsResult> {
+  const normalized = { search: params.search?.trim() || '', category: params.category || '', tag: params.tag || '',
+    page: params.page ?? 1, limit: params.limit ?? 24, excludeNsfw: params.excludeNsfw !== false, prompt_type: params.prompt_type || 'image' };
+  return getCache().getOrLoad(`prompts:${JSON.stringify(normalized)}`, () => loadPrompts(normalized));
 }
 
 // SSR and API routes share the same filter aggregation and cache.

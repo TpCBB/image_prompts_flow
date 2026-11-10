@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchPrompts, fetchCategories, fetchTags } from '@/lib/data';
+import { resetCache } from '@/lib/cache';
 import { queryFilterMetadata, queryTags } from '@/lib/filter-data';
 
 const { query } = vi.hoisted(() => ({ query: {
@@ -9,8 +10,9 @@ vi.mock('@/lib/supabase', () => ({ supabase: { from: () => query } }));
 vi.mock('@/lib/filter-data', () => ({ queryFilterMetadata: vi.fn(), queryTags: vi.fn() }));
 
 beforeEach(() => {
+  resetCache();
   for (const method of Object.values(query)) method.mockReturnValue(query);
-  vi.mocked(queryFilterMetadata).mockResolvedValue({ categories: [], tagCounts: new Map(), hiddenDuplicateIds: [] });
+  vi.mocked(queryFilterMetadata).mockResolvedValue({ categories: [], tagCounts: new Map() });
 });
 
 describe('Initial load errors', () => {
@@ -23,7 +25,6 @@ describe('Initial load errors', () => {
 
   it('does not swallow metadata or tag failures', async () => {
     vi.mocked(queryFilterMetadata).mockRejectedValue(new Error('Metadata unavailable'));
-    await expect(fetchPrompts()).rejects.toThrow('Metadata unavailable');
     await expect(fetchCategories()).rejects.toThrow('Metadata unavailable');
     vi.mocked(queryTags).mockRejectedValue(new Error('Tags unavailable'));
     await expect(fetchTags()).rejects.toThrow('Tags unavailable');

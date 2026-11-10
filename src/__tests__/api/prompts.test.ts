@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET, POST } from '@/app/api/prompts/route';
 import { GET as GET_DETAIL, PUT, DELETE } from '@/app/api/prompts/[id]/route';
 import { resetCache } from '@/lib/cache';
-import { queryFilterMetadata } from '@/lib/filter-data';
 
 const { query, from } = vi.hoisted(() => {
   const query = { select: vi.fn(), eq: vi.fn(), neq: vi.fn(), not: vi.fn(), or: vi.fn(), contains: vi.fn(), order: vi.fn(), range: vi.fn(), abortSignal: vi.fn(), single: vi.fn() };
@@ -12,7 +11,6 @@ const { query, from } = vi.hoisted(() => {
 });
 vi.mock('@/lib/supabase', () => ({ supabase: { from } }));
 vi.mock('@/lib/supabase-server', () => ({ getSupabaseAdmin: () => ({ from }) }));
-vi.mock('@/lib/filter-data', () => ({ queryFilterMetadata: vi.fn() }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -20,19 +18,17 @@ beforeEach(() => {
   for (const method of Object.values(query)) method.mockReturnValue(query);
   query.range.mockResolvedValue({ data: [], count: 0, error: null });
   query.single.mockResolvedValue({ data: { id: 1, title: 'Example' }, error: null });
-  vi.mocked(queryFilterMetadata).mockResolvedValue({ categories: [], tagCounts: new Map(), hiddenDuplicateIds: [] });
   vi.stubEnv('ADMIN_API_TOKEN', 'test-admin-token');
 });
 afterEach(() => vi.unstubAllEnvs());
 const request = (queryString: string) => new NextRequest(`http://localhost/api/prompts?${queryString}`);
 
 describe('Prompt API', () => {
-  it('excludes duplicate records before filtering and pagination', async () => {
-    vi.mocked(queryFilterMetadata).mockResolvedValue({ categories: [], tagCounts: new Map(), hiddenDuplicateIds: [1009, 1010] });
+  it('queries the database visibility view before filtering and pagination', async () => {
     const response = await GET(request('page=2&limit=24&category=生活&search=修图'));
     expect(response.status).toBe(200);
-    expect(query.not).toHaveBeenCalledWith('id', 'in', '(1009,1010)');
-    expect(query.not.mock.invocationCallOrder[0]).toBeLessThan(query.range.mock.invocationCallOrder[0]);
+    expect(from).toHaveBeenCalledWith('gallery_prompts');
+    expect(query.not).not.toHaveBeenCalled();
     expect(query.range).toHaveBeenCalledWith(24, 47);
   });
 
@@ -46,7 +42,7 @@ describe('Prompt API', () => {
   it('defaults to image prompts, excludes NSFW and breaks timestamp ties using ID', async () => {
     expect((await GET(request(''))).status).toBe(200);
     expect(query.eq).toHaveBeenCalledWith('prompt_type', 'image');
-    expect(query.neq).toHaveBeenCalledWith('category', 'NSFW');
+    expect(query.eq).toHaveBeenCalledWith('is_nsfw', false);
     expect(query.order.mock.calls).toEqual([
       ['created_at', { ascending: false }], ['id', { ascending: false }],
     ]);

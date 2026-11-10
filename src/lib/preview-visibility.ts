@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { getImageUrl } from './config';
+import { IMAGE_CANONICAL_BASE_URL } from './config';
 
 interface PreviewRecord {
   id: number;
@@ -15,7 +15,9 @@ export function getHiddenDuplicateIds(rows: PreviewRecord[]): number[] {
 
   for (const row of rows) {
     if (row.prompt_type !== 'image' || !row.preview) continue;
-    const imageUrl = getImageUrl(row.preview);
+    // Selection must not change when a local test or a deployment uses a
+    // different asset host. This matches the database gallery view.
+    const imageUrl = /^https?:\/\//.test(row.preview) ? row.preview : `${IMAGE_CANONICAL_BASE_URL}/${row.preview}`;
     const rank = createHash('sha256')
       .update(`preview-selection-v1\0${imageUrl}\0${row.id}`).digest('hex');
     const previous = representatives.get(imageUrl);

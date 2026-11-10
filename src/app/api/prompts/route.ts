@@ -3,30 +3,13 @@ import { supabase } from "@/lib/supabase";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { successResponse, ApiError } from "@/lib/api-response";
 import { getCache } from "@/lib/cache";
-import { mapDbPromptToPrompt } from "@/lib/type-mapping";
-import { DbPrompt } from "@/types";
-import { buildSearchFilter, parsePositiveInteger } from "@/lib/prompt-query";
+import { parsePositiveInteger } from "@/lib/prompt-query";
 import { authorizeAdminRequest } from "@/lib/admin-auth";
-import { queryFilterMetadata } from "@/lib/filter-data";
+import { fetchPrompts } from "@/lib/data";
 import type { PromptType } from "@/types";
-import { runReadQuery, readErrorResponse } from "@/lib/read-guard";
+import { readErrorResponse } from "@/lib/read-guard";
 
 export const dynamic = "force-dynamic";
-
-// Cache TTL: 60 seconds
-const CACHE_TTL = 60 * 1000;
-
-/**
- * Generate cache key from query parameters
- */
-function generateCacheKey(params: Record<string, string>): string {
-  const sortedParams = Object.entries(params)
-    .filter(([, value]) => value !== "")
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-    .join("&");
-  return `prompts:${sortedParams}`;
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,79 +36,7 @@ export async function GET(request: NextRequest) {
     if (offset > 10_000) return ApiError.BAD_REQUEST("翻页范围过大，请使用搜索或筛选缩小范围");
     if (category.length > 100 || tag.length > 100) return ApiError.BAD_REQUEST("筛选条件不能超过 100 个字符");
 
-    // Generate cache key
-    const cacheKey = generateCacheKey({
-      search,
-      category,
-      tag,
-      promptType,
-      excludeNsfw: String(excludeNsfw),
-      page: String(page),
-      limit: String(limit),
-    });
-
-    // Check cache first
-    const cache = getCache();
-    const result = await cache.getOrLoad(cacheKey, async () => {
-      // 构建查询
-      const { hiddenDuplicateIds } = await queryFilterMetadata(promptType as PromptType);
-      let query = supabase.from("prompts").select("*", { count: "exact" });
-      if (hiddenDuplicateIds.length) {
-        query = query.not("id", "in", `(${hiddenDuplicateIds.join(",")})`);
-      }
-
-      // 搜索过滤
-      if (search) {
-        query = query.or(buildSearchFilter(search));
-      }
-
-      // 分类过滤
-      if (category) {
-        query = query.eq("category", category);
-      }
-
-      // 标签过滤
-      if (tag) {
-        query = query.contains("tags", [tag]);
-      }
-
-      // prompt_type 过滤
-      if (promptType) {
-        query = query.eq("prompt_type", promptType);
-      }
-
-      // NSFW 过滤（默认排除，除非明确选择 NSFW 分类）
-      if (excludeNsfw) {
-        query = query.neq("category", "NSFW");
-      }
-
-      // ORDER BY created_at DESC for consistent sorting (Requirements 2.3)
-      query = query.order("created_at", { ascending: false }).order("id", { ascending: false });
-
-      const { data, count, error } = await runReadQuery((signal) =>
-        query.abortSignal(signal).range(offset, offset + limit - 1));
-
-      if (error) {
-        throw error;
-      }
-
-      const total = count || 0;
-      const totalPages = Math.ceil(total / limit);
-
-      // Map database records to frontend Prompt type (Requirements 3.1, 3.2)
-      const prompts = (data as DbPrompt[] || []).map(mapDbPromptToPrompt);
-
-      return {
-        data: prompts,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages,
-          hasMore: page < totalPages,
-        },
-      };
-    }, CACHE_TTL);
+    const result = await fetchPrompts({ search, category, tag, page, limit, excludeNsfw, prompt_type: promptType as PromptType });
 
     return successResponse(result);
   } catch (err) {

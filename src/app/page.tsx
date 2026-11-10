@@ -2,7 +2,6 @@ import { Suspense } from 'react';
 import PromptsContainerWrapper from '@/components/PromptsContainerWrapper';
 import { fetchPrompts, fetchTags, fetchCategories } from '@/lib/data';
 import Loading from './loading';
-import { getCache } from '@/lib/cache';
 import { parseBrowseState } from '@/lib/browse-state';
 
 // Failed renders must not become a cached "empty library". Data caches still
@@ -22,7 +21,7 @@ async function PromptLibrary({ searchParams }: { searchParams: PageSearchParams 
   
   // 服务端并行获取初始数据，传入 prompt_type 确保数据一致
   const [promptsResult, tags, categories] = await Promise.all([
-    getCache().getOrLoad(`home-prompts:${JSON.stringify(filters)}`, () => fetchPrompts(filters)),
+    fetchPrompts(filters),
     fetchTags(state.promptType),
     fetchCategories(state.promptType),
   ]);
