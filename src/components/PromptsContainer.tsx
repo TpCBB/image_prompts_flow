@@ -233,6 +233,7 @@ export default function PromptsContainer({
           <span className="text-[13px] font-medium text-gray-500 dark:text-gray-400">
             {t.promptCount.replace("{count}", totalCount.toString())}
           </span>
+          {(searchQuery || selectedCategory || selectedTag) && <button onClick={() => { setSearchQuery(''); setSelectedCategory(null); setSelectedTag(null); }} className="text-sm font-medium text-blue-600 dark:text-blue-400 px-2 py-1">{t.clearFilters}</button>}
         </div>
 
         {/* Prompts Grid */}

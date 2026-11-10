@@ -100,7 +100,7 @@ export default function MobileSearch({
                             flex items-center justify-center
                             hover:bg-gray-400 dark:hover:bg-gray-500
                             transition-colors"
-                  aria-label="Clear search"
+                  aria-label={t.clearSearch}
                 >
                   <X className="w-3 h-3 text-white" strokeWidth={2.5} />
                 </button>

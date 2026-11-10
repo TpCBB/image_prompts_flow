@@ -20,10 +20,11 @@ export default function CategoryFilter({
   const t = translations[lang];
 
   return (
-    <div className="flex flex-wrap gap-2 py-3 border-b border-white/20 dark:border-white/10">
+    <div aria-label={t.category} className="flex flex-nowrap sm:flex-wrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden gap-2 py-3 border-b border-white/20 dark:border-white/10">
       <button
         onClick={() => onCategorySelect(null)}
-        className={`px-4 py-2 rounded-xl text-[13px] font-medium 
+        aria-pressed={selectedCategory === null}
+        className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-[13px] font-medium
                    backdrop-blur-md border
                    transition-all duration-200 active:scale-[0.97] ${
           selectedCategory === null
@@ -37,7 +38,8 @@ export default function CategoryFilter({
         <button
           key={category}
           onClick={() => onCategorySelect(category)}
-          className={`px-4 py-2 rounded-xl text-[13px] font-medium 
+          aria-pressed={selectedCategory === category}
+          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-[13px] font-medium
                      backdrop-blur-md border
                      transition-all duration-200 active:scale-[0.97] ${
             selectedCategory === category
