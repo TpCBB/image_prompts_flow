@@ -8,6 +8,7 @@ import { getImageUrl } from '@/lib/config';
 import { useClipboard, useImageLoader } from '@/hooks';
 import { isNsfwLabel } from '@/lib/content-visibility';
 import { promptShareUrl } from '@/lib/browse-state';
+import { useDialogFocus } from '@/hooks/useDialogFocus';
 
 interface PromptModalProps {
   prompt: Prompt;
@@ -34,6 +35,8 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
   const [showShareMenu, setShowShareMenu] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, onClose);
   const { imageSrc, imgRef, onLoad, onError } = useImageLoader({
     src: prompt.preview ? getImageUrl(prompt.preview) : null,
   });
@@ -46,21 +49,6 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
   // 根据语言选择显示的标题和提示词（英文优先，没有则回退到中文）
   const displayTitle = lang === 'en' && prompt.title_en ? prompt.title_en : prompt.title;
   const displayPrompt = lang === 'en' && prompt.prompt_en ? prompt.prompt_en : prompt.prompt;
-
-  // 按 ESC 关闭
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleEsc);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    
-    return () => {
-      document.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [onClose]);
 
   // 点击外部关闭分享菜单
   useEffect(() => {
@@ -106,6 +94,8 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
       {/* 模态框 - 苹果风格动画 */}
       <div 
         role="dialog"
+        ref={dialogRef}
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby={titleId}
         className="relative w-full max-w-4xl max-h-[90vh] 
@@ -164,6 +154,8 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
               <div className="relative" ref={shareMenuRef}>
                 <button
                   onClick={() => setShowShareMenu(!showShareMenu)}
+                  aria-label={t.share}
+                  aria-expanded={showShareMenu}
                   className="flex items-center gap-1.5 text-[13px] text-gray-500 
                             hover:text-gray-900 dark:hover:text-white transition-all duration-200
                             px-2.5 py-1.5 -mx-2.5 -my-1.5 rounded-lg

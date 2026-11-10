@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { Search, X } from 'lucide-react';
 import { Language } from '@/types';
 import { translations } from '@/lib/i18n';
+import { useDialogFocus } from '@/hooks/useDialogFocus';
 
 interface MobileSearchProps {
   isOpen: boolean;
@@ -21,30 +22,9 @@ export default function MobileSearch({
   lang,
 }: MobileSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, onClose, isOpen);
   const t = translations[lang];
-
-  // Focus input when panel opens
-  useEffect(() => {
-    if (isOpen && inputRef.current) {
-      // Small delay to ensure animation has started
-      const timer = setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
-
-  // Handle escape key to close
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -52,6 +32,8 @@ export default function MobileSearch({
     <div 
       className="fixed inset-x-0 top-0 z-[60] sm:hidden animate-mobile-search-in"
       role="dialog"
+      ref={dialogRef}
+      tabIndex={-1}
       aria-modal="true"
       aria-label={t.search}
     >

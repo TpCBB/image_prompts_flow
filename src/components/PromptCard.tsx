@@ -46,7 +46,7 @@ export default function PromptCard({ prompt, lang, onClick }: PromptCardProps) {
       : displayPrompt;
 
   return (
-    <div
+    <article
       className="group bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl rounded-3xl overflow-hidden 
                  shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)]
                  hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] 
@@ -112,11 +112,13 @@ export default function PromptCard({ prompt, lang, onClick }: PromptCardProps) {
           className="font-semibold text-[15px] text-gray-900 dark:text-white mb-2 
                        leading-snug tracking-tight line-clamp-2"
         >
-          {displayTitle}
+          <button type="button" onClick={(event) => { event.stopPropagation(); onClick?.(); }} className="text-left rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-500">{displayTitle}</button>
         </h3>
 
-        <p
-          className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed cursor-pointer
+        <button
+          type="button"
+          aria-expanded={expanded}
+          className="block w-full text-left text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed cursor-pointer
                      hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
           onClick={(event) => {
             event.stopPropagation();
@@ -124,7 +126,7 @@ export default function PromptCard({ prompt, lang, onClick }: PromptCardProps) {
           }}
         >
           {expanded ? displayPrompt : truncatedPrompt}
-        </p>
+        </button>
 
         {/* Author */}
         <div className="flex items-center mt-3 mb-4">
@@ -184,6 +186,6 @@ export default function PromptCard({ prompt, lang, onClick }: PromptCardProps) {
           )}
         </div>
       </div>
-    </div>
+    </article>
   );
 }
