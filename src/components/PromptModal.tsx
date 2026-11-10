@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { X, Copy, Check, Share2, ChevronDown } from 'lucide-react';
 import { Prompt, Language } from '@/types';
 import { translations } from '@/lib/i18n';
 import { getImageUrl } from '@/lib/config';
-import { useClipboard } from '@/hooks';
+import { useClipboard, useImageLoader } from '@/hooks';
+import { isNsfwLabel } from '@/lib/content-visibility';
 
 interface PromptModalProps {
   prompt: Prompt;
@@ -31,6 +32,10 @@ const shareOptions = [
 export default function PromptModal({ prompt, lang, onClose }: PromptModalProps) {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const { imageSrc, imgRef, onLoad, onError } = useImageLoader({
+    src: prompt.preview ? getImageUrl(prompt.preview) : null,
+  });
   const t = translations[lang];
 
   // Use custom hook for clipboard operations
@@ -46,11 +51,12 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleEsc);
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     
     return () => {
       document.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = previousOverflow;
     };
   }, [onClose]);
 
@@ -97,6 +103,9 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
       
       {/* 模态框 - 苹果风格动画 */}
       <div 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="relative w-full max-w-4xl max-h-[90vh] 
                    bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl
                    rounded-3xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)]
@@ -109,6 +118,7 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
         {/* 关闭按钮 - 液态玻璃 */}
         <button
           onClick={onClose}
+          aria-label={lang === 'zh' ? '关闭详情' : 'Close details'}
           className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full
                     bg-white/20 dark:bg-black/30 backdrop-blur-xl
                     border border-white/30 dark:border-white/10
@@ -126,7 +136,10 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
         {/* 左侧图片 */}
         <div className="sm:w-1/2 bg-gray-100 dark:bg-gray-800 flex-shrink-0">
           <img
-            src={getImageUrl(prompt.preview)}
+            ref={imgRef}
+            src={imageSrc}
+            onLoad={onLoad}
+            onError={onError}
             alt={prompt.title}
             className="w-full h-full object-cover max-h-[40vh] sm:max-h-[90vh]"
           />
@@ -136,7 +149,7 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
         <div className="sm:w-1/2 flex flex-col overflow-hidden">
           {/* 头部 */}
           <div className="p-6 pb-4 border-b border-gray-100 dark:border-gray-800">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            <h2 id={titleId} className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
               {displayTitle}
             </h2>
             <div className="flex items-center justify-between">
@@ -189,18 +202,18 @@ export default function PromptModal({ prompt, lang, onClose }: PromptModalProps)
 
           {/* 标签 - 过滤重复 */}
           <div className="px-6 py-3 flex flex-wrap gap-2 border-b border-gray-100 dark:border-gray-800">
-            <span className="px-3 py-1 rounded-full text-[12px] font-medium
+            {!isNsfwLabel(prompt.category) && <span className="px-3 py-1 rounded-full text-[12px] font-medium
                            bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
               {prompt.category}
-            </span>
-            {prompt.sub_category && prompt.sub_category !== prompt.category && (
+            </span>}
+            {prompt.sub_category && !isNsfwLabel(prompt.sub_category) && prompt.sub_category !== prompt.category && (
               <span className="px-3 py-1 rounded-full text-[12px] font-medium
                              bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
                 {prompt.sub_category}
               </span>
             )}
             {Array.from(new Set(prompt.tags || []))
-              .filter(tag => tag !== prompt.category && tag !== prompt.sub_category)
+              .filter(tag => !isNsfwLabel(tag) && tag !== prompt.category && tag !== prompt.sub_category)
               .slice(0, 3)
               .map((tag, i) => (
                 <span key={i} className="px-3 py-1 rounded-full text-[12px] font-medium

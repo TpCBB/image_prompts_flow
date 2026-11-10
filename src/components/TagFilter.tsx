@@ -2,6 +2,7 @@
 
 import { Tag, Language } from '@/types';
 import { translations } from '@/lib/i18n';
+import { isVisibleTag } from '@/lib/content-visibility';
 
 interface TagFilterProps {
   tags: Tag[];
@@ -32,7 +33,7 @@ export default function TagFilter({
       >
         {t.allTags}
       </button>
-      {tags.slice(0, 15).map((tag) => (
+      {tags.filter(isVisibleTag).slice(0, 15).map((tag) => (
         <button
           key={tag.id}
           onClick={() => onTagSelect(tag.slug)}

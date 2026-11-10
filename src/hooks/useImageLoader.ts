@@ -57,10 +57,11 @@ export function useImageLoader(options: UseImageLoaderOptions): UseImageLoaderRe
     setUseFallback(false);
 
     // Check if image is already in browser cache
-    const img = new Image();
-    img.src = src;
+    // Inspect the rendered element: a separate Image() eagerly downloads every
+    // preview and defeats loading="lazy" on the card.
+    const img = imgRef.current;
     
-    if (img.complete && img.naturalWidth > 0) {
+    if (img?.complete && img.naturalWidth > 0) {
       setIsLoaded(true);
     }
   }, [src]);

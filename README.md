@@ -1,99 +1,70 @@
 # AI Image Prompts 图像提示词库
 
-一个现代化的 AI 图像生成提示词收集和展示网站，支持中英文切换、搜索、分类筛选等功能。
+基于 Next.js 15、React、TypeScript 和 Supabase 的提示词库，支持图片 / 功能性提示词切换、中英文展示、搜索、分类、标签、分页和一键复制。
 
-## 功能特性
-
-- 🔍 **全文搜索** - 搜索标题、提示词内容、作者
-- 🏷️ **标签筛选** - 按风格标签快速过滤
-- 📂 **分类浏览** - 按工作、生活、学习等分类查看
-- 🌐 **中英文切换** - 支持多语言界面
-- 📋 **一键复制** - 快速复制提示词到剪贴板
-- 📱 **响应式设计** - 支持桌面端和移动端
-
-## 技术栈
-
-- **框架**: Next.js 14 (App Router)
-- **样式**: TailwindCSS
-- **图标**: Lucide React
-- **语言**: TypeScript
-- **部署**: GitHub Pages
-
-## 快速开始
-
-### 安装依赖
+## 本地运行
 
 ```bash
-npm install
+npm ci
+cp .env.local.example .env.local
 ```
 
-### 开发模式
+在 `.env.local` 中填写 Supabase 项目地址和匿名访问密钥。数据库需要包含 `prompts` 和 `tags` 表，并配置相应的公开读取权限。
 
 ```bash
 npm run dev
 ```
 
-访问 http://localhost:3000
+打开 http://localhost:3000。
 
-### 构建生产版本
+## 功能与查询规则
+
+- 默认展示图片提示词，按创建时间和 ID 倒序分页，每页 24 条。
+- 同一图片被多个图片提示词引用时，随机固定保留一条展示，其余条目隐藏；搜索、筛选、标签统计和分页总数使用同一规则。
+- 搜索覆盖中英文标题、提示词正文和作者，最多 200 个字符。
+- NSFW 分类和标签在筛选入口、卡片及详情标签中隐藏，默认列表排除 NSFW 分类；不删除数据库记录。
+- 分类和标签统计使用分页读取，避免数据超过单次查询上限后遗漏；同一类型的统计共享 60 秒缓存和进行中的查询。
+- 切换筛选会取消旧请求，清空筛选恢复首页数据；切换语言保留当前列表和已加载的分页。
+- 图片按需加载，加载失败时显示本地占位图。
+
+## API
+
+公开读取：
+
+- `GET /api/prompts`：支持 `search`、`category`、`tag`、`prompt_type`、`page` 和 `limit`；`prompt_type` 默认 `image`，可选 `functional`，`limit` 范围 1–100。
+- `GET /api/prompts/:id`：查询单个提示词。
+- `GET /api/categories`、`GET /api/tags`：可传 `prompt_type` 筛选。
+
+管理写入：
+
+- `POST /api/prompts`：新增。
+- `PUT /api/prompts/:id`：修改。
+- `DELETE /api/prompts/:id`：删除。
+
+写入需要在服务端配置 `SUPABASE_SERVICE_ROLE_KEY` 和 `ADMIN_API_TOKEN`，并携带 `Authorization: Bearer <ADMIN_API_TOKEN>`。管理令牌只供受信任的服务端或本地工具使用，不能放入浏览器代码或 `NEXT_PUBLIC_` 环境变量。未配置管理令牌时写入返回 403，令牌缺失或不匹配时返回 401。
+
+## 验证
 
 ```bash
+npm test
+npx tsc --noEmit
 npm run build
 ```
 
-## 部署到 GitHub Pages
+测试包括筛选切换的异步竞态、分页去重、重复图片的固定展示选择、请求取消和超时、管理写入授权、查询参数校验，以及超过 1000 条数据时的标签统计。
 
-1. **创建 GitHub 仓库** 并推送代码
+## 部署
 
-2. **配置 GitHub Pages**:
-   - 进入仓库 Settings → Pages
-   - Source 选择 "GitHub Actions"
+本项目使用服务端渲染和 API 路由，需要 Vercel 等支持 Next.js 的平台，或运行 Node.js 服务，不能直接部署到仅托管静态文件的 GitHub Pages。
 
-3. **推送到 main 分支**，自动触发部署
+在部署平台配置与 `.env.local` 对应的环境变量，然后执行：
 
-4. 如果仓库名不是 `username.github.io`，需要修改 `next.config.js`:
-
-```js
-const nextConfig = {
-  output: 'export',
-  basePath: '/your-repo-name',
-  assetPrefix: '/your-repo-name/',
-  // ...
-}
+```bash
+npm run build
+npm start
 ```
 
-## 数据结构
-
-### prompts.json
-
-```json
-{
-  "title": "提示词标题",
-  "preview": "预览图 URL",
-  "prompt": "完整提示词内容",
-  "author": "@作者名",
-  "link": "来源链接",
-  "mode": "generate | edit",
-  "category": "分类",
-  "sub_category": "子分类"
-}
-```
-
-### tags.json
-
-```json
-{
-  "id": "tag-1",
-  "name_zh": "中文名",
-  "name_en": "english_name",
-  "slug": "url-slug",
-  "count": 100
-}
-```
-
-## 添加新提示词
-
-编辑 `prompts.json`，添加新的提示词对象到数组开头（最新的在前）。
+`R2_*` 环境变量为图片上传工具预留，当前浏览页面不依赖它们。现有图片源配置在 `src/lib/config.ts`。
 
 ## 许可
 

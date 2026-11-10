@@ -84,6 +84,8 @@ export default function Header({
                 <input
                   type="text"
                   placeholder={t.search}
+                  maxLength={200}
+                  aria-label={t.search}
                   value={searchQuery}
                   onChange={(e) => onSearchChange(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl text-[14px]
@@ -117,6 +119,7 @@ export default function Header({
               {/* Language Toggle - 液态玻璃风格 */}
               <button
                 onClick={() => onLangChange(lang === 'zh' ? 'en' : 'zh')}
+                aria-label={lang === 'zh' ? '切换为英文' : 'Switch to Chinese'}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl
                           text-[13px] font-medium text-gray-700 dark:text-gray-200
                           bg-white/60 dark:bg-white/10 backdrop-blur-xl

@@ -78,6 +78,8 @@ export default function MobileSearch({
                 ref={inputRef}
                 type="text"
                 placeholder={t.search}
+              maxLength={200}
+              aria-label={t.search}
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl text-[15px]

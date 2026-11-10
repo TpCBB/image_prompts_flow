@@ -1,7 +1,10 @@
 import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { supabaseAdmin } from '@/lib/supabase-server';
+import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { successResponse, ApiError } from '@/lib/api-response';
+import { authorizeAdminRequest } from '@/lib/admin-auth';
+import { getCache } from '@/lib/cache';
+import { parsePositiveInteger } from '@/lib/prompt-query';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -10,9 +13,9 @@ interface RouteParams {
 // 获取单个提示词
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
-  const numericId = parseInt(id, 10);
+  const numericId = parsePositiveInteger(id, 0);
 
-  if (isNaN(numericId)) {
+  if (numericId === null) {
     return ApiError.BAD_REQUEST('无效的 ID');
   }
 
@@ -34,10 +37,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 // 更新提示词
 export async function PUT(request: NextRequest, { params }: RouteParams) {
+  const authError = authorizeAdminRequest(request);
+  if (authError) return authError;
   const { id } = await params;
-  const numericId = parseInt(id, 10);
+  const numericId = parsePositiveInteger(id, 0);
 
-  if (isNaN(numericId)) {
+  if (numericId === null) {
     return ApiError.BAD_REQUEST('无效的 ID');
   }
 
@@ -66,7 +71,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       return ApiError.BAD_REQUEST('没有提供要更新的字段');
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('prompts')
       .update(updateData)
       .eq('id', numericId)
@@ -80,6 +85,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       return ApiError.SERVER_ERROR(error.message);
     }
 
+    getCache().clear();
     return successResponse(data, '更新成功');
   } catch {
     return ApiError.BAD_REQUEST('请求体解析失败');
@@ -88,15 +94,17 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
 // 删除提示词
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const authError = authorizeAdminRequest(request);
+  if (authError) return authError;
   const { id } = await params;
-  const numericId = parseInt(id, 10);
+  const numericId = parsePositiveInteger(id, 0);
 
-  if (isNaN(numericId)) {
+  if (numericId === null) {
     return ApiError.BAD_REQUEST('无效的 ID');
   }
 
   // 先检查是否存在
-  const { data: existing } = await supabaseAdmin
+  const { data: existing } = await getSupabaseAdmin()
     .from('prompts')
     .select('id')
     .eq('id', numericId)
@@ -106,7 +114,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return ApiError.NOT_FOUND('提示词不存在');
   }
 
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from('prompts')
     .delete()
     .eq('id', numericId);
@@ -115,5 +123,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return ApiError.SERVER_ERROR(error.message);
   }
 
+  getCache().clear();
   return successResponse(null, '删除成功');
 }

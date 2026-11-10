@@ -1,10 +1,14 @@
 import { NextRequest } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { successResponse, ApiError } from "@/lib/api-response";
 import { getCache } from "@/lib/cache";
 import { mapDbPromptToPrompt } from "@/lib/type-mapping";
 import { DbPrompt } from "@/types";
+import { buildSearchFilter, parsePositiveInteger } from "@/lib/prompt-query";
+import { authorizeAdminRequest } from "@/lib/admin-auth";
+import { queryFilterMetadata } from "@/lib/filter-data";
+import type { PromptType } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +22,7 @@ function generateCacheKey(params: Record<string, string>): string {
   const sortedParams = Object.entries(params)
     .filter(([, value]) => value !== "")
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
     .join("&");
   return `prompts:${sortedParams}`;
 }
@@ -28,13 +32,22 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
 
     // 获取查询参数
-    const search = searchParams.get("search") || "";
+    const search = (searchParams.get("search") || "").trim();
     const category = searchParams.get("category") || "";
     const tag = searchParams.get("tag") || "";
-    const promptType = searchParams.get("prompt_type") || "";
-    const excludeNsfw = searchParams.get("excludeNsfw") === "true";
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "24", 10);
+    const promptType = searchParams.get("prompt_type") || "image";
+    const excludeNsfw = searchParams.get("excludeNsfw") !== "false";
+    const page = parsePositiveInteger(searchParams.get("page"), 1);
+    const limit = parsePositiveInteger(searchParams.get("limit"), 24);
+    if (page === null || limit === null || limit > 100 || !Number.isSafeInteger(page * limit)) {
+      return ApiError.BAD_REQUEST("page 必须是正整数，limit 必须为 1–100");
+    }
+    if (!["image", "functional"].includes(promptType)) {
+      return ApiError.BAD_REQUEST("prompt_type 必须是 image 或 functional");
+    }
+    if (search.length > 200) {
+      return ApiError.BAD_REQUEST("搜索内容不能超过 200 个字符");
+    }
     const offset = (page - 1) * limit;
 
     // Generate cache key
@@ -66,13 +79,15 @@ export async function GET(request: NextRequest) {
     }
 
     // 构建查询
+    const { hiddenDuplicateIds } = await queryFilterMetadata(promptType as PromptType);
     let query = supabase.from("prompts").select("*", { count: "exact" });
+    if (hiddenDuplicateIds.length) {
+      query = query.not("id", "in", `(${hiddenDuplicateIds.join(",")})`);
+    }
 
     // 搜索过滤
     if (search) {
-      query = query.or(
-        `title.ilike.%${search}%,prompt.ilike.%${search}%,author.ilike.%${search}%`
-      );
+      query = query.or(buildSearchFilter(search));
     }
 
     // 分类过滤
@@ -96,7 +111,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ORDER BY created_at DESC for consistent sorting (Requirements 2.3)
-    query = query.order("created_at", { ascending: false });
+    query = query.order("created_at", { ascending: false }).order("id", { ascending: false });
 
     // 分页
     query = query.range(offset, offset + limit - 1);
@@ -137,6 +152,9 @@ export async function GET(request: NextRequest) {
 
 // 创建新提示词
 export async function POST(request: NextRequest) {
+  const authError = authorizeAdminRequest(request);
+  if (authError) return authError;
+
   try {
     const body = await request.json();
 
@@ -153,7 +171,7 @@ export async function POST(request: NextRequest) {
       return ApiError.BAD_REQUEST("mode 必须是 generate 或 edit");
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from("prompts")
       .insert({
         title: body.title,

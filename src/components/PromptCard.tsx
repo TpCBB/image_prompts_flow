@@ -6,6 +6,7 @@ import { Prompt, Language } from "@/types";
 import { translations } from "@/lib/i18n";
 import { getImageUrl } from "@/lib/config";
 import { useImageLoader, useClipboard } from "@/hooks";
+import { isNsfwLabel } from "@/lib/content-visibility";
 
 interface PromptCardProps {
   prompt: Prompt;
@@ -13,7 +14,7 @@ interface PromptCardProps {
   onClick?: () => void;
 }
 
-const FALLBACK_IMAGE = "https://placehold.co/400x300/f3f4f6/9ca3af?text=No+Image";
+const FALLBACK_IMAGE = "/placeholder.svg";
 
 export default function PromptCard({ prompt, lang, onClick }: PromptCardProps) {
   const [expanded, setExpanded] = useState(false);
@@ -86,7 +87,7 @@ export default function PromptCard({ prompt, lang, onClick }: PromptCardProps) {
           />
         )}
         {/* Category Badge - Apple 风格毛玻璃 */}
-        <div className="absolute top-3 right-3">
+        {!isNsfwLabel(prompt.category) && <div className="absolute top-3 right-3">
           <span
             className="px-3 py-1.5 rounded-full text-[11px] font-semibold tracking-wide
                           bg-white/70 dark:bg-black/50 backdrop-blur-md
@@ -95,7 +96,7 @@ export default function PromptCard({ prompt, lang, onClick }: PromptCardProps) {
           >
             {prompt.category}
           </span>
-        </div>
+        </div>}
       </div>
 
       {/* Content */}
@@ -110,7 +111,10 @@ export default function PromptCard({ prompt, lang, onClick }: PromptCardProps) {
         <p
           className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed cursor-pointer
                      hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-          onClick={() => setExpanded(!expanded)}
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded(!expanded);
+          }}
         >
           {expanded ? displayPrompt : truncatedPrompt}
         </p>

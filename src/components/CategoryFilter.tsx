@@ -2,6 +2,7 @@
 
 import { Language } from '@/types';
 import { translations } from '@/lib/i18n';
+import { isNsfwLabel } from '@/lib/content-visibility';
 
 interface CategoryFilterProps {
   categories: string[];
@@ -32,7 +33,7 @@ export default function CategoryFilter({
       >
         {t.allCategories}
       </button>
-      {categories.map((category) => (
+      {categories.filter((category) => !isNsfwLabel(category)).map((category) => (
         <button
           key={category}
           onClick={() => onCategorySelect(category)}

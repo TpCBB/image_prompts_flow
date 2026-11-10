@@ -64,8 +64,18 @@ function isRetryableError(error: unknown): boolean {
 /**
  * Sleep for specified milliseconds
  */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function sleep(ms: number, signal?: AbortSignal): Promise<boolean> {
+  return new Promise((resolve) => {
+    const finish = (completed: boolean) => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
+      resolve(completed);
+    };
+    const cancel = () => finish(false);
+    const timer = setTimeout(() => finish(true), ms);
+    signal?.addEventListener('abort', cancel, { once: true });
+    if (signal?.aborted) cancel();
+  });
 }
 
 /**
@@ -109,39 +119,47 @@ export class ApiClient {
     options: RequestOptions = {}
   ): Promise<ApiResponse<T>> {
     const { retries, retryDelay, timeout } = this.options;
-    const maxAttempts = options.skipRetry ? 1 : retries;
+    const maxAttempts = options.skipRetry ? 1 : Math.max(1, retries);
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (options.signal?.aborted) {
+        return { success: false, error: 'Request was cancelled' };
+      }
+      const controller = new AbortController();
+      let timedOut = false;
+      const timeoutId = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, timeout);
+      const cancel = () => controller.abort();
+      options.signal?.addEventListener('abort', cancel, { once: true });
       try {
-        // Create abort controller for timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-        // Merge signals if provided
-        const signal = options.signal 
-          ? this.mergeAbortSignals(options.signal, controller.signal)
-          : controller.signal;
-
-        const response = await fetch(url, {
-          ...init,
-          signal,
-          headers: {
-            'Content-Type': 'application/json',
-            ...init.headers,
-            ...options.headers,
-          },
-        });
-
-        clearTimeout(timeoutId);
-
-        // Parse response
-        const data = await response.json();
+        let response: Response;
+        let data;
+        try {
+          response = await fetch(url, {
+            ...init,
+            signal: controller.signal,
+            headers: {
+              'Content-Type': 'application/json',
+              ...init.headers,
+              ...options.headers,
+            },
+          });
+          data = await response.json();
+        } finally {
+          // Also clean up when fetch/json throws, before waiting for a retry.
+          clearTimeout(timeoutId);
+          options.signal?.removeEventListener('abort', cancel);
+        }
 
         if (!response.ok) {
           // Check if we should retry
           if (attempt < maxAttempts - 1 && isRetryableError(response)) {
-            await sleep(getBackoffDelay(attempt, retryDelay));
+            if (!await sleep(getBackoffDelay(attempt, retryDelay), options.signal)) {
+              return { success: false, error: 'Request was cancelled' };
+            }
             continue;
           }
 
@@ -156,9 +174,16 @@ export class ApiClient {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
+        if (options.signal?.aborted) {
+          return { success: false, error: 'Request was cancelled' };
+        }
+        if (timedOut) lastError = new Error('Request timed out');
+
         // Check if we should retry
-        if (attempt < maxAttempts - 1 && isRetryableError(error)) {
-          await sleep(getBackoffDelay(attempt, retryDelay));
+        if (attempt < maxAttempts - 1 && (timedOut || isRetryableError(error))) {
+          if (!await sleep(getBackoffDelay(attempt, retryDelay), options.signal)) {
+            return { success: false, error: 'Request was cancelled' };
+          }
           continue;
         }
 
@@ -181,24 +206,6 @@ export class ApiClient {
   }
 
   /**
-   * Merge multiple abort signals
-   */
-  private mergeAbortSignals(signal1: AbortSignal, signal2: AbortSignal): AbortSignal {
-    const controller = new AbortController();
-    
-    const abort = () => controller.abort();
-    
-    signal1.addEventListener('abort', abort);
-    signal2.addEventListener('abort', abort);
-    
-    if (signal1.aborted || signal2.aborted) {
-      controller.abort();
-    }
-    
-    return controller.signal;
-  }
-
-  /**
    * Handle error with optional toast notification
    */
   private handleError<T>(response: ApiResponse<T>, retryFn?: () => Promise<ApiResponse<T>>): ApiResponse<T> {
@@ -215,6 +222,7 @@ export class ApiClient {
     const url = buildUrl(this.options.baseUrl, path, options.params);
     
     const response = await this.fetchWithRetry<T>(url, { method: 'GET' }, options);
+    if (options.signal?.aborted) return response;
     
     return this.handleError(response, () => this.get<T>(path, options));
   }
