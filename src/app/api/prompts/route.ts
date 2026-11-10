@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { supabase } from "@/lib/supabase";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { successResponse, ApiError } from "@/lib/api-response";
 import { getCache } from "@/lib/cache";

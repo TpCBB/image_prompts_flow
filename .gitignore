@@ -37,3 +37,7 @@ next-env.d.ts
 
 # Cloudflare local deployment state
 .wrangler/
+
+# Local Supabase CLI state and browser review artifacts
+supabase/.temp/
+output/

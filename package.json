@@ -6,11 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --max-warnings=0",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:coverage": "vitest --run --coverage",
-    "images:prepare": "node scripts/prepare-images.mjs"
+    "images:prepare": "node scripts/prepare-images.mjs",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck && npm test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.87.0",
@@ -22,6 +24,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16",
+    "@eslint/eslintrc": "3.3.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "@types/node": "^20",
@@ -29,6 +32,8 @@
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.20",
+    "eslint": "9.39.5",
+    "eslint-config-next": "15.5.29",
     "fast-check": "^4.4.0",
     "jsdom": "^27.3.0",
     "postcss": "^8.5.23",

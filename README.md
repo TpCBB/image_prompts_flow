@@ -49,15 +49,20 @@ npm run dev
 
 ```bash
 npm test
-npx tsc --noEmit
+npm run typecheck
+npm run lint
 npm run build
 ```
 
 测试包括筛选切换的异步竞态、分页去重、重复图片的固定展示选择、请求取消和超时、管理写入授权、查询参数校验，以及超过 1000 条数据时的标签统计。
 
+`npm run check` 一次运行代码检查、类型检查与测试。推送和 Pull Request 会触发同样的自动检查，并构建服务端应用；检查流程不使用生产数据库密钥，也不发布网站。构建使用系统字体，不依赖下载 Google 字体。
+
 ## 部署
 
 本项目使用服务端渲染和 API 路由，需要 Vercel 等支持 Next.js 的平台，或运行 Node.js 服务，不能直接部署到仅托管静态文件的 GitHub Pages。
+
+已有 GitHub Pages 自动发布流程已移除，改为持续检查。Vercel 使用现有 Git 集成或平台部署命令发布，发布前先应用数据库迁移、准备并发布图片素材，具体见 [数据库查询](docs/database-queries.md) 和 [图片托管](docs/image-storage.md)。
 
 Vercel Production 还必须配置 `UPSTASH_REDIS_REST_URL` 和 `UPSTASH_REDIS_REST_TOKEN`，用于跨实例限流；缺失时页面和 API 返回 503。完整的上线顺序、数据库匿名直连关闭步骤和保护边界见 [防刷配置](docs/abuse-protection.md)。
 

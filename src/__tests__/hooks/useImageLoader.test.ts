@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fc from 'fast-check';
 import { renderHook, act } from '@testing-library/react';
 import { useImageLoader } from '@/hooks/useImageLoader';

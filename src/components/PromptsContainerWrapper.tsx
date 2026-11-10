@@ -3,7 +3,7 @@
 import React from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import PromptsContainer from '@/components/PromptsContainer';
-import { Prompt, Tag, PromptType } from '@/types';
+import { Prompt, Tag } from '@/types';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import type { BrowseState } from '@/lib/browse-state';
 

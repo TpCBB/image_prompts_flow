@@ -13,7 +13,7 @@ import CategoryFilter from "@/components/CategoryFilter";
 import PromptCard from "@/components/PromptCard";
 import PromptModal from "@/components/PromptModal";
 import { PromptCardSkeletonList } from "@/components/PromptCardSkeleton";
-import { Prompt, Tag, Language, PromptType } from "@/types";
+import { Prompt, Tag, PromptType } from "@/types";
 import { translations } from "@/lib/i18n";
 import { useDebounce, useScrollDirection } from "@/hooks";
 import type { PromptsResult } from "@/lib/data";
