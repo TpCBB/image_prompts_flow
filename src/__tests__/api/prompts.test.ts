@@ -2,12 +2,12 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET, POST } from '@/app/api/prompts/route';
-import { PUT, DELETE } from '@/app/api/prompts/[id]/route';
+import { GET as GET_DETAIL, PUT, DELETE } from '@/app/api/prompts/[id]/route';
 import { resetCache } from '@/lib/cache';
 import { queryFilterMetadata } from '@/lib/filter-data';
 
 const { query, from } = vi.hoisted(() => {
-  const query = { select: vi.fn(), eq: vi.fn(), neq: vi.fn(), not: vi.fn(), or: vi.fn(), contains: vi.fn(), order: vi.fn(), range: vi.fn() };
+  const query = { select: vi.fn(), eq: vi.fn(), neq: vi.fn(), not: vi.fn(), or: vi.fn(), contains: vi.fn(), order: vi.fn(), range: vi.fn(), abortSignal: vi.fn(), single: vi.fn() };
   return { query, from: vi.fn(() => query) };
 });
 vi.mock('@/lib/supabase', () => ({ supabase: { from } }));
@@ -19,6 +19,7 @@ beforeEach(() => {
   resetCache();
   for (const method of Object.values(query)) method.mockReturnValue(query);
   query.range.mockResolvedValue({ data: [], count: 0, error: null });
+  query.single.mockResolvedValue({ data: { id: 1, title: 'Example' }, error: null });
   vi.mocked(queryFilterMetadata).mockResolvedValue({ categories: [], tagCounts: new Map(), hiddenDuplicateIds: [] });
   vi.stubEnv('ADMIN_API_TOKEN', 'test-admin-token');
 });
@@ -35,7 +36,7 @@ describe('Prompt API', () => {
     expect(query.range).toHaveBeenCalledWith(24, 47);
   });
 
-  it.each(['page=0', 'page=-1', 'page=1abc', 'page=1.5', 'limit=0', 'limit=101', 'limit=NaN', 'page=9007199254740992', 'prompt_type=unknown'])(
+  it.each(['page=0', 'page=-1', 'page=1abc', 'page=1.5', 'limit=0', 'limit=101', 'limit=NaN', 'page=9007199254740992', 'prompt_type=unknown', 'page=10000', `category=${'a'.repeat(101)}`, `tag=${'a'.repeat(101)}`])(
     'rejects invalid query %s before touching the database', async (queryString) => {
       expect((await GET(request(queryString))).status).toBe(400);
       expect(from).not.toHaveBeenCalled();
@@ -65,6 +66,33 @@ describe('Prompt API', () => {
     await GET(request(new URLSearchParams({ search: 'x&tag=y' }).toString()));
     await GET(request(new URLSearchParams({ search: 'x', tag: 'y' }).toString()));
     expect(from).toHaveBeenCalledTimes(2);
+  });
+
+  it('coalesces a burst of identical list requests into a single database query', async () => {
+    const responses = await Promise.all(Array.from({ length: 20 }, () => GET(request(''))));
+    expect(responses.every((response) => response.status === 200)).toBe(true);
+    expect(query.range).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not cache a database failure or expose its internal message', async () => {
+    query.range.mockResolvedValueOnce({ data: null, count: null, error: { message: 'private database detail' } });
+    const response = await GET(request(''));
+    expect(response.status).toBe(500);
+    expect(await response.text()).not.toContain('private database detail');
+    expect((await GET(request(''))).status).toBe(200);
+    expect(query.range).toHaveBeenCalledTimes(2);
+  });
+
+  it('caches and coalesces detail reads, including missing IDs', async () => {
+    const detail = () => GET_DETAIL(request(''), { params: Promise.resolve({ id: '1' }) });
+    const responses = await Promise.all(Array.from({ length: 20 }, detail));
+    expect(responses.every((response) => response.status === 200)).toBe(true);
+    expect(query.single).toHaveBeenCalledTimes(1);
+    query.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
+    for (let i = 0; i < 2; i++) {
+      expect((await GET_DETAIL(request(''), { params: Promise.resolve({ id: '2' }) })).status).toBe(404);
+    }
+    expect(query.single).toHaveBeenCalledTimes(2);
   });
 
   it('blocks POST, PUT and DELETE without a token before database access', async () => {

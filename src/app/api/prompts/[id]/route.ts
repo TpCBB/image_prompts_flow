@@ -5,6 +5,9 @@ import { successResponse, ApiError } from '@/lib/api-response';
 import { authorizeAdminRequest } from '@/lib/admin-auth';
 import { getCache } from '@/lib/cache';
 import { parsePositiveInteger } from '@/lib/prompt-query';
+import { runReadQuery, readErrorResponse } from '@/lib/read-guard';
+
+export const dynamic = 'force-dynamic';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -19,20 +22,27 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return ApiError.BAD_REQUEST('无效的 ID');
   }
 
-  const { data, error } = await supabase
-    .from('prompts')
-    .select('*')
-    .eq('id', numericId)
-    .single();
+  try {
+    const result = await getCache().getOrLoad(`prompt-detail:${numericId}`, async () => {
+      const { data, error } = await runReadQuery((signal) => supabase
+        .from('prompts')
+        .select('*')
+        .eq('id', numericId)
+        .abortSignal(signal).single());
 
-  if (error) {
-    if (error.code === 'PGRST116') {
-      return ApiError.NOT_FOUND('提示词不存在');
-    }
-    return ApiError.SERVER_ERROR(error.message);
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return { found: false as const, data: null };
+        }
+        throw error;
+      }
+
+      return { found: true as const, data };
+    });
+    return result.found ? successResponse(result.data) : ApiError.NOT_FOUND('提示词不存在');
+  } catch (error) {
+    return readErrorResponse(error);
   }
-
-  return successResponse(data);
 }
 
 // 更新提示词

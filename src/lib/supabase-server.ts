@@ -1,12 +1,13 @@
+import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 let adminClient: SupabaseClient | undefined;
 
-// Initialize only after a write is authorized. Public reads do not need a
-// service-role key and must remain available when management is disabled.
+// Only server components and API handlers may import this client. Management
+// endpoints authorize ADMIN_API_TOKEN before executing any write.
 export function getSupabaseAdmin() {
   if (!adminClient) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) throw new Error('Missing server-side Supabase configuration');
     adminClient = createClient(url, key, {

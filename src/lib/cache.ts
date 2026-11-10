@@ -27,6 +27,8 @@ export class MemoryCache {
   private accessOrder: string[];
   private readonly defaultTtl: number;
   private readonly maxSize: number;
+  private pending = new Map<string, Promise<unknown>>();
+  private generation = 0;
 
   constructor(options: CacheOptions = {}) {
     this.cache = new Map();
@@ -82,6 +84,25 @@ export class MemoryCache {
     this.accessOrder.push(key);
   }
 
+  /** Share concurrent misses, including failures, without caching rejected work. */
+  async getOrLoad<T>(key: string, load: () => Promise<T>, ttl?: number): Promise<T> {
+    const cached = this.get<T>(key);
+    if (cached !== null) return cached;
+    const existing = this.pending.get(key);
+    if (existing) return existing as Promise<T>;
+    if (this.pending.size >= 64) throw new Error('Too many pending cache loads');
+
+    const generation = this.generation;
+    const task = Promise.resolve().then(load).then((result) => {
+      if (this.generation === generation) this.set(key, result, ttl);
+      return result;
+    }).finally(() => {
+      if (this.pending.get(key) === task) this.pending.delete(key);
+    });
+    this.pending.set(key, task);
+    return task;
+  }
+
   /**
    * Delete a specific key from cache
    */
@@ -98,6 +119,8 @@ export class MemoryCache {
    * Clear all entries from cache
    */
   clear(): void {
+    this.generation++;
+    this.pending.clear();
     this.cache.clear();
     this.accessOrder = [];
   }

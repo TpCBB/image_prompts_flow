@@ -61,13 +61,9 @@ ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON TABLE public.categories, public.tags, public.prompts, public.admin_users FROM PUBLIC, anon, authenticated;
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT SELECT ON TABLE public.categories, public.tags, public.prompts TO anon, authenticated;
+-- All reads go through the server; anonymous reads bypass its rate limiter.
 GRANT ALL ON TABLE public.categories, public.tags, public.prompts, public.admin_users TO service_role;
 REVOKE ALL ON SEQUENCE public.categories_id_seq, public.prompts_id_seq, public.admin_users_id_seq FROM PUBLIC, anon, authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.categories_id_seq, public.prompts_id_seq, public.admin_users_id_seq TO service_role;
-
-CREATE POLICY categories_public_read ON public.categories FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY tags_public_read ON public.tags FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY prompts_public_read ON public.prompts FOR SELECT TO anon, authenticated USING (true);
 
 NOTIFY pgrst, 'reload schema';

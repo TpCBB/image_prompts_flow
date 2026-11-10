@@ -4,7 +4,7 @@ import { queryFilterMetadata, queryTags } from '@/lib/filter-data';
 import { resetCache } from '@/lib/cache';
 
 const { query, from, tagResult } = vi.hoisted(() => ({
-  query: { select: vi.fn(), eq: vi.fn(), order: vi.fn(), range: vi.fn() },
+  query: { select: vi.fn(), eq: vi.fn(), order: vi.fn(), range: vi.fn(), abortSignal: vi.fn() },
   from: vi.fn(),
   tagResult: { data: [
     { id: 'nature', slug: 'nature', name_zh: '自然', name_en: 'Nature', count: 999 },
@@ -19,7 +19,8 @@ beforeEach(() => {
   query.select.mockReturnValue(query);
   query.eq.mockReturnValue(query);
   query.order.mockReturnValue(query);
-  from.mockImplementation((table) => table === 'tags' ? { select: async () => tagResult } : query);
+  query.abortSignal.mockReturnValue(query);
+  from.mockImplementation((table) => table === 'tags' ? { select: () => ({ abortSignal: async () => tagResult }) } : query);
 });
 
 describe('Filter metadata', () => {

@@ -3,6 +3,7 @@ import { successResponse, ApiError } from '@/lib/api-response';
 import { getCache } from '@/lib/cache';
 import { queryFilterMetadata } from '@/lib/filter-data';
 import type { PromptType } from '@/types';
+import { readErrorResponse } from '@/lib/read-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,6 @@ export async function GET(request: NextRequest) {
     return successResponse(result);
   } catch (error) {
     console.error('API /api/categories error:', error);
-    return ApiError.SERVER_ERROR('加载分类失败');
+    return readErrorResponse(error, '加载分类失败');
   }
 }

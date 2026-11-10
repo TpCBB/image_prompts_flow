@@ -4,6 +4,7 @@ import { Prompt, Tag, PromptType, DbPrompt } from '@/types';
 import { mapDbPromptToPrompt } from './type-mapping';
 import { buildSearchFilter } from './prompt-query';
 import { queryFilterMetadata, queryTags } from './filter-data';
+import { runReadQuery } from './read-guard';
 
 export interface FetchPromptsParams {
   search?: string;
@@ -104,9 +105,10 @@ export async function fetchPrompts(params: FetchPromptsParams = {}): Promise<Pro
 
   // Apply sorting and pagination
   query = query.order('created_at', { ascending: false })
-    .order('id', { ascending: false }).range(offset, offset + limit - 1);
+    .order('id', { ascending: false });
 
-  const { data, error, count } = await query;
+  const { data, error, count } = await runReadQuery((signal) =>
+    query.abortSignal(signal).range(offset, offset + limit - 1));
 
   if (error) {
     console.error('Error fetching prompts:', error);
@@ -143,11 +145,11 @@ export async function fetchCategories(prompt_type?: PromptType): Promise<string[
 
 // 获取单个提示词 (服务端)
 export async function fetchPromptById(id: number): Promise<Prompt | null> {
-  const { data, error } = await supabase
+  const { data, error } = await runReadQuery((signal) => supabase
     .from('prompts')
     .select('*')
     .eq('id', id)
-    .single();
+    .abortSignal(signal).single());
 
   if (error) {
     console.error('Error fetching prompt:', error);

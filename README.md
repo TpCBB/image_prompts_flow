@@ -9,7 +9,7 @@ npm ci
 cp .env.local.example .env.local
 ```
 
-在 `.env.local` 中填写 Supabase 项目地址和匿名访问密钥。数据库需要包含 `prompts` 和 `tags` 表，并配置相应的公开读取权限。
+在 `.env.local` 中填写 Supabase 项目地址和仅供服务端使用的 `SUPABASE_SERVICE_ROLE_KEY`。数据库需要包含 `prompts` 和 `tags` 表；网页通过服务端读取，不需要向浏览器提供数据库密钥。
 
 ```bash
 npm run dev
@@ -23,7 +23,7 @@ npm run dev
 - 同一图片被多个图片提示词引用时，随机固定保留一条展示，其余条目隐藏；搜索、筛选、标签统计和分页总数使用同一规则。
 - 搜索覆盖中英文标题、提示词正文和作者，最多 200 个字符。
 - NSFW 分类和标签在筛选入口、卡片及详情标签中隐藏，默认列表排除 NSFW 分类；不删除数据库记录。
-- 分类和标签统计使用分页读取，避免数据超过单次查询上限后遗漏；同一类型的统计共享 60 秒缓存和进行中的查询。
+- 分类和标签统计使用分页读取，避免数据超过单次查询上限后遗漏；同一类型的统计共享 5 分钟缓存和进行中的查询。
 - 切换筛选会取消旧请求，清空筛选恢复首页数据；切换语言保留当前列表和已加载的分页。
 - 图片按需加载，加载失败时显示本地占位图。
 
@@ -56,6 +56,8 @@ npm run build
 ## 部署
 
 本项目使用服务端渲染和 API 路由，需要 Vercel 等支持 Next.js 的平台，或运行 Node.js 服务，不能直接部署到仅托管静态文件的 GitHub Pages。
+
+Vercel Production 还必须配置 `UPSTASH_REDIS_REST_URL` 和 `UPSTASH_REDIS_REST_TOKEN`，用于跨实例限流；缺失时页面和 API 返回 503。完整的上线顺序、数据库匿名直连关闭步骤和保护边界见 [防刷配置](docs/abuse-protection.md)。
 
 在部署平台配置与 `.env.local` 对应的环境变量，然后执行：
 

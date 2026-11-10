@@ -9,6 +9,7 @@ import { buildSearchFilter, parsePositiveInteger } from "@/lib/prompt-query";
 import { authorizeAdminRequest } from "@/lib/admin-auth";
 import { queryFilterMetadata } from "@/lib/filter-data";
 import type { PromptType } from "@/types";
+import { runReadQuery, readErrorResponse } from "@/lib/read-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,8 @@ export async function GET(request: NextRequest) {
       return ApiError.BAD_REQUEST("搜索内容不能超过 200 个字符");
     }
     const offset = (page - 1) * limit;
+    if (offset > 10_000) return ApiError.BAD_REQUEST("翻页范围过大，请使用搜索或筛选缩小范围");
+    if (category.length > 100 || tag.length > 100) return ApiError.BAD_REQUEST("筛选条件不能超过 100 个字符");
 
     // Generate cache key
     const cacheKey = generateCacheKey({
@@ -63,90 +66,71 @@ export async function GET(request: NextRequest) {
 
     // Check cache first
     const cache = getCache();
-    const cachedResult = cache.get<{
-      data: ReturnType<typeof mapDbPromptToPrompt>[];
-      pagination: {
-        page: number;
-        limit: number;
-        total: number;
-        totalPages: number;
-        hasMore: boolean;
+    const result = await cache.getOrLoad(cacheKey, async () => {
+      // 构建查询
+      const { hiddenDuplicateIds } = await queryFilterMetadata(promptType as PromptType);
+      let query = supabase.from("prompts").select("*", { count: "exact" });
+      if (hiddenDuplicateIds.length) {
+        query = query.not("id", "in", `(${hiddenDuplicateIds.join(",")})`);
+      }
+
+      // 搜索过滤
+      if (search) {
+        query = query.or(buildSearchFilter(search));
+      }
+
+      // 分类过滤
+      if (category) {
+        query = query.eq("category", category);
+      }
+
+      // 标签过滤
+      if (tag) {
+        query = query.contains("tags", [tag]);
+      }
+
+      // prompt_type 过滤
+      if (promptType) {
+        query = query.eq("prompt_type", promptType);
+      }
+
+      // NSFW 过滤（默认排除，除非明确选择 NSFW 分类）
+      if (excludeNsfw) {
+        query = query.neq("category", "NSFW");
+      }
+
+      // ORDER BY created_at DESC for consistent sorting (Requirements 2.3)
+      query = query.order("created_at", { ascending: false }).order("id", { ascending: false });
+
+      const { data, count, error } = await runReadQuery((signal) =>
+        query.abortSignal(signal).range(offset, offset + limit - 1));
+
+      if (error) {
+        throw error;
+      }
+
+      const total = count || 0;
+      const totalPages = Math.ceil(total / limit);
+
+      // Map database records to frontend Prompt type (Requirements 3.1, 3.2)
+      const prompts = (data as DbPrompt[] || []).map(mapDbPromptToPrompt);
+
+      return {
+        data: prompts,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasMore: page < totalPages,
+        },
       };
-    }>(cacheKey);
-
-    if (cachedResult) {
-      return successResponse(cachedResult);
-    }
-
-    // 构建查询
-    const { hiddenDuplicateIds } = await queryFilterMetadata(promptType as PromptType);
-    let query = supabase.from("prompts").select("*", { count: "exact" });
-    if (hiddenDuplicateIds.length) {
-      query = query.not("id", "in", `(${hiddenDuplicateIds.join(",")})`);
-    }
-
-    // 搜索过滤
-    if (search) {
-      query = query.or(buildSearchFilter(search));
-    }
-
-    // 分类过滤
-    if (category) {
-      query = query.eq("category", category);
-    }
-
-    // 标签过滤
-    if (tag) {
-      query = query.contains("tags", [tag]);
-    }
-
-    // prompt_type 过滤
-    if (promptType) {
-      query = query.eq("prompt_type", promptType);
-    }
-
-    // NSFW 过滤（默认排除，除非明确选择 NSFW 分类）
-    if (excludeNsfw) {
-      query = query.neq("category", "NSFW");
-    }
-
-    // ORDER BY created_at DESC for consistent sorting (Requirements 2.3)
-    query = query.order("created_at", { ascending: false }).order("id", { ascending: false });
-
-    // 分页
-    query = query.range(offset, offset + limit - 1);
-
-    const { data, count, error } = await query;
-
-    if (error) {
-      console.error("Supabase error:", error);
-      return ApiError.SERVER_ERROR(error.message);
-    }
-
-    const total = count || 0;
-    const totalPages = Math.ceil(total / limit);
-
-    // Map database records to frontend Prompt type (Requirements 3.1, 3.2)
-    const prompts = (data as DbPrompt[] || []).map(mapDbPromptToPrompt);
-
-    const result = {
-      data: prompts,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasMore: page < totalPages,
-      },
-    };
-
-    // Store in cache
-    cache.set(cacheKey, result, CACHE_TTL);
+    }, CACHE_TTL);
 
     return successResponse(result);
   } catch (err) {
     console.error("API /api/prompts error:", err);
-    return ApiError.SERVER_ERROR("Internal server error");
+    return readErrorResponse(err);
   }
 }
 

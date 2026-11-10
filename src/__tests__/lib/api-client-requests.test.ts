@@ -5,6 +5,15 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('API request lifecycle', () => {
+  it.each([429, 503])('does not retry when the server returns backpressure (%s)', async (status) => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false, status, json: async () => ({ success: false, error: '请稍后再试' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await new ApiClient().get('/api/prompts')).toEqual({ success: false, error: '请稍后再试' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it('does not start a request with an already aborted signal', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

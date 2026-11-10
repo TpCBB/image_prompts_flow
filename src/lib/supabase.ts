@@ -1,9 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import 'server-only';
+import { getSupabaseAdmin } from './supabase-server';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Browsers use our protected API; anonymous database access can be revoked.
+export const supabase = getSupabaseAdmin();
 
 // Re-export types from central types module for backward compatibility
 export type { DbPrompt, Tag as DbTag } from '@/types';

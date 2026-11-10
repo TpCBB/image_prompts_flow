@@ -35,7 +35,7 @@ export function errorResponse(error: string, status: number = 500) {
       success: false,
       error,
     },
-    { status }
+    { status, headers: { 'Cache-Control': 'private, no-store' } }
   );
 }
 

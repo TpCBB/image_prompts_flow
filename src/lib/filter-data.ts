@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { getCache } from './cache';
 import { isNsfwLabel, isVisibleTag } from './content-visibility';
 import { getHiddenDuplicateIds } from './preview-visibility';
+import { runReadQuery } from './read-guard';
 import type { PromptType, Tag } from '@/types';
 
 interface FilterMetadata {
@@ -11,7 +12,6 @@ interface FilterMetadata {
 }
 
 const PAGE_SIZE = 1000;
-const pendingQueries = new Map<string, Promise<FilterMetadata>>();
 
 async function readMetadata(promptType?: PromptType): Promise<FilterMetadata> {
   const categories = new Set<string>();
@@ -23,8 +23,8 @@ async function readMetadata(promptType?: PromptType): Promise<FilterMetadata> {
   for (let offset = 0; ; offset += PAGE_SIZE) {
     let query = supabase.from('prompts').select('id,preview,prompt_type,category,tags');
     if (promptType) query = query.eq('prompt_type', promptType);
-    const { data, error } = await query.order('id', { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
+    const { data, error } = await runReadQuery((signal) => query.abortSignal(signal)
+      .order('id', { ascending: true }).range(offset, offset + PAGE_SIZE - 1));
     if (error) throw new Error(error.message);
 
     rows.push(...(data || []));
@@ -43,29 +43,24 @@ async function readMetadata(promptType?: PromptType): Promise<FilterMetadata> {
   }
 
   const result = { categories: Array.from(categories).sort(), tagCounts, hiddenDuplicateIds };
-  getCache().set(`filter-metadata:${promptType || 'all'}`, result);
   return result;
 }
 
 export async function queryFilterMetadata(promptType?: PromptType): Promise<FilterMetadata> {
   const key = `filter-metadata:${promptType || 'all'}`;
-  const cached = getCache().get<FilterMetadata>(key);
-  if (cached) return cached;
-  const pending = pendingQueries.get(key);
-  if (pending) return pending;
-  const task = readMetadata(promptType).finally(() => pendingQueries.delete(key));
-  pendingQueries.set(key, task);
-  return task;
+  return getCache().getOrLoad(key, () => readMetadata(promptType), 5 * 60_000);
 }
 
 export async function queryTags(promptType?: PromptType): Promise<Tag[]> {
-  const [{ tagCounts }, { data, error }] = await Promise.all([
-    queryFilterMetadata(promptType),
-    supabase.from('tags').select('*'),
-  ]);
-  if (error) throw new Error(error.message);
-  return (data || [])
-    .map((tag) => ({ ...tag, count: tagCounts.get(tag.slug) || 0 }))
-    .filter((tag) => tag.count > 0 && isVisibleTag(tag))
-    .sort((a, b) => b.count - a.count || a.slug.localeCompare(b.slug));
+  return getCache().getOrLoad(`tags-data:${promptType || 'all'}`, async () => {
+    const [{ tagCounts }, { data, error }] = await Promise.all([
+      queryFilterMetadata(promptType),
+      runReadQuery((signal) => supabase.from('tags').select('*').abortSignal(signal)),
+    ]);
+    if (error) throw new Error(error.message);
+    return (data || [])
+      .map((tag) => ({ ...tag, count: tagCounts.get(tag.slug) || 0 }))
+      .filter((tag) => tag.count > 0 && isVisibleTag(tag))
+      .sort((a, b) => b.count - a.count || a.slug.localeCompare(b.slug));
+  }, 5 * 60_000);
 }

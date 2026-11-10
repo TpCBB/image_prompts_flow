@@ -55,8 +55,8 @@ function isRetryableError(error: unknown): boolean {
     return true;
   }
   if (error instanceof Response) {
-    // Retry on 5xx errors and 429 (rate limit)
-    return error.status >= 500 || error.status === 429;
+    // Respect server backpressure instead of multiplying blocked requests.
+    return error.status >= 500 && error.status !== 503;
   }
   return false;
 }
