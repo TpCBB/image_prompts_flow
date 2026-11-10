@@ -3,6 +3,8 @@ import { supabase } from "@/lib/supabase";
 import { successResponse, ApiError } from "@/lib/api-response";
 import { getCache } from "@/lib/cache";
 
+export const dynamic = "force-dynamic";
+
 // Cache TTL: 60 seconds
 const CACHE_TTL = 60 * 1000;
 

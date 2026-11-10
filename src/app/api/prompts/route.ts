@@ -6,6 +6,8 @@ import { getCache } from "@/lib/cache";
 import { mapDbPromptToPrompt } from "@/lib/type-mapping";
 import { DbPrompt } from "@/types";
 
+export const dynamic = "force-dynamic";
+
 // Cache TTL: 60 seconds
 const CACHE_TTL = 60 * 1000;
 
