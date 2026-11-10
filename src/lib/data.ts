@@ -45,16 +45,6 @@ function calculatePagination(
   };
 }
 
-/**
- * Create empty prompts result for error cases
- */
-function createEmptyPromptsResult(page: number, limit: number): PromptsResult {
-  return {
-    data: [],
-    pagination: calculatePagination(page, limit, 0),
-  };
-}
-
 // 获取提示词列表 (服务端)
 export async function fetchPrompts(params: FetchPromptsParams = {}): Promise<PromptsResult> {
   const {
@@ -68,13 +58,7 @@ export async function fetchPrompts(params: FetchPromptsParams = {}): Promise<Pro
 
   const offset = (page - 1) * limit;
 
-  let hiddenDuplicateIds: number[];
-  try {
-    ({ hiddenDuplicateIds } = await queryFilterMetadata(prompt_type));
-  } catch (error) {
-    console.error('Error fetching prompt visibility:', error);
-    return createEmptyPromptsResult(page, limit);
-  }
+  const { hiddenDuplicateIds } = await queryFilterMetadata(prompt_type);
   let query = supabase.from('prompts').select('*', { count: 'exact' });
   if (hiddenDuplicateIds.length) {
     query = query.not('id', 'in', `(${hiddenDuplicateIds.join(',')})`);
@@ -111,8 +95,7 @@ export async function fetchPrompts(params: FetchPromptsParams = {}): Promise<Pro
     query.abortSignal(signal).range(offset, offset + limit - 1));
 
   if (error) {
-    console.error('Error fetching prompts:', error);
-    return createEmptyPromptsResult(page, limit);
+    throw new Error('Failed to load prompts', { cause: error });
   }
 
   // Map database records to frontend types using shared mapping function
@@ -126,21 +109,11 @@ export async function fetchPrompts(params: FetchPromptsParams = {}): Promise<Pro
 
 // SSR and API routes share the same filter aggregation and cache.
 export async function fetchTags(prompt_type?: PromptType): Promise<Tag[]> {
-  try {
-    return await queryTags(prompt_type);
-  } catch (error) {
-    console.error('Error fetching tags:', error);
-    return [];
-  }
+  return queryTags(prompt_type);
 }
 
 export async function fetchCategories(prompt_type?: PromptType): Promise<string[]> {
-  try {
-    return (await queryFilterMetadata(prompt_type)).categories;
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-    return [];
-  }
+  return (await queryFilterMetadata(prompt_type)).categories;
 }
 
 // 获取单个提示词 (服务端)
@@ -152,8 +125,8 @@ export async function fetchPromptById(id: number): Promise<Prompt | null> {
     .abortSignal(signal).single());
 
   if (error) {
-    console.error('Error fetching prompt:', error);
-    return null;
+    if (error.code === 'PGRST116') return null;
+    throw new Error('Failed to load prompt', { cause: error });
   }
 
   if (!data) {
