@@ -1,0 +1,15 @@
+.git
+.vercel
+.env
+.env.*
+node_modules
+.next
+out
+build
+coverage
+local_data
+output
+.idea
+.DS_Store
+*.tsbuildinfo
+*.pem

@@ -17,11 +17,17 @@
 ## Vercel 上线顺序
 
 1. 配置 `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`。旧的 `NEXT_PUBLIC_SUPABASE_URL` 仍兼容，浏览器不再需要匿名密钥。
-2. 创建 Upstash Redis（或从 Vercel Marketplace 添加），将 `UPSTASH_REDIS_REST_URL`、`UPSTASH_REDIS_REST_TOKEN` 配置到 Vercel Production。建议 Preview 用独立 Redis；计数键也按环境隔离。密钥不能加 `NEXT_PUBLIC_` 前缀。
+2. 从 Vercel Marketplace 添加 Upstash Redis 可直接使用自动注入的 `KV_REST_API_URL`、`KV_REST_API_TOKEN`。也可手动配置完整的 `UPSTASH_REDIS_REST_URL`、`UPSTASH_REDIS_REST_TOKEN`；手动配置优先且必须成对提供。免费方案应关闭自动升级，确认服务条款的步骤由账号所有者完成。建议 Preview 用独立 Redis；计数键也按环境隔离。密钥不能加 `NEXT_PUBLIC_` 前缀。
 3. 部署并验证首页、筛选、搜索、详情。**Production 未配置共享 Redis 时，页面和 API 返回 503。** 本地与 Preview 未配置时用内存计数，仅适合开发验证。
 4. 新版本工作后，在该站点的 Supabase 数据库执行 `supabase/harden-public-access.sql`，取消 `prompts/categories/tags` 的匿名和普通用户直读权限。若数据库被其他网站共用，先核对它们是否依赖这些权限。
 5. 复验网站正常；用旧匿名 key 请求 `rest/v1/prompts?select=id&limit=1` 应得到权限错误。不要把管理密钥放进浏览器验证。
 6. 在 Vercel Firewall 配置适合该站点的机器人防护和异常流量规则，观察日志及使用量。后台开关与预算配置需要所属 Vercel 项目的访问权限，不能仅靠仓库配置完成。
+
+CLI 发布时先运行 `vercel deploy --dry --json` 核对文件列表。`.vercelignore` 明确排除本地环境文件、`local_data/` 备份、图片原始目录及检查输出；Vercel 的生产配置通过环境变量注入。
+
+可先用 `vercel deploy --prod --skip-domain` 创建使用生产配置的独立部署，验证页面和 API 后再 `vercel promote` 切换正式域名。新版验证通过后应用 `supabase/migrations/` 中关闭匿名读取的迁移；原始表和记录保留。
+
+完成后执行 `npm run verify:access`，使用本地匿名 / publishable key 验证网站仍能展示数据、未授权写入被拒绝、四个数据库表 / 视图的直接读取均返回权限错误。脚本拒绝服务端管理密钥。受限网络下可用 `HTTPS_PROXY=http://127.0.0.1:7891 NODE_USE_ENV_PROXY=1 npm run verify:access`。
 
 规则在 `src/middleware.ts` 中。Redis 使用一个原子 Lua 命令检查全部额度，实例扩容不会重置计数。Redis 故障会暂时影响可用性，这是避免故障期间无限查库的取舍。
 

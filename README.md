@@ -64,7 +64,7 @@ npm run build
 
 已有 GitHub Pages 自动发布流程已移除，改为持续检查。Vercel 使用现有 Git 集成或平台部署命令发布，发布前先应用数据库迁移、准备并发布图片素材，具体见 [数据库查询](docs/database-queries.md) 和 [图片托管](docs/image-storage.md)。
 
-Vercel Production 还必须配置 `UPSTASH_REDIS_REST_URL` 和 `UPSTASH_REDIS_REST_TOKEN`，用于跨实例限流；缺失时页面和 API 返回 503。完整的上线顺序、数据库匿名直连关闭步骤和保护边界见 [防刷配置](docs/abuse-protection.md)。
+Vercel Production 必须有共享 Redis 限流配置：可使用 Marketplace 自动注入的 `KV_REST_API_URL` / `KV_REST_API_TOKEN`，或手动配置完整的 `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`。手动配置优先，不能混用两套凭据；缺失或故障时页面和 API 返回 503。完整的上线顺序、数据库匿名直连关闭步骤和保护边界见 [防刷配置](docs/abuse-protection.md)。
 
 在部署平台配置与 `.env.local` 对应的环境变量，然后执行：
 

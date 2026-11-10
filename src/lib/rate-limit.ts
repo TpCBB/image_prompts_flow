@@ -59,8 +59,11 @@ export function consumeMemoryRules(rules: RateRule[], now = Date.now()): RateDec
 }
 
 export async function consumeRules(rules: RateRule[]): Promise<RateDecision> {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  // The Vercel Marketplace integration manages/rotates KV_* credentials.
+  // Explicit Upstash configuration takes precedence as a complete pair.
+  const hasExplicitUpstash = !!(process.env.UPSTASH_REDIS_REST_URL || process.env.UPSTASH_REDIS_REST_TOKEN);
+  const url = hasExplicitUpstash ? process.env.UPSTASH_REDIS_REST_URL : process.env.KV_REST_API_URL;
+  const token = hasExplicitUpstash ? process.env.UPSTASH_REDIS_REST_TOKEN : process.env.KV_REST_API_TOKEN;
   if (!url && !token) {
     // Production on Vercel must not silently fall back to independent counters.
     if (process.env.VERCEL_ENV === 'production') {

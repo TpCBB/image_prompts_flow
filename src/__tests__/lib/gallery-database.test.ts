@@ -53,4 +53,18 @@ describe('Gallery SQL', () => {
     expect(rows[0]).toMatchObject({ view_access: false, function_access: false });
     expect(rows[0].options).toContain('security_invoker=true');
   });
+
+  it('revokes legacy public reads while keeping server reads and every original row', async () => {
+    await db.exec('GRANT SELECT ON public.prompts, public.tags, public.categories TO anon, authenticated;');
+    const before = await db.query<{ count: number; allowed: boolean }>("SELECT (SELECT count(*)::int FROM public.prompts) AS count, has_table_privilege('anon','public.prompts','SELECT') AS allowed");
+    expect(before.rows[0].allowed).toBe(true);
+    await db.exec(await readFile('supabase/harden-public-access.sql', 'utf8'));
+    const access = await db.query<{ role: string; can_read: boolean }>(`SELECT r.role, has_table_privilege(r.role, 'public.' || t.name, 'SELECT') AS can_read
+      FROM (VALUES ('anon'),('authenticated'),('service_role')) AS r(role)
+      CROSS JOIN (VALUES ('prompts'),('tags'),('categories')) AS t(name)`);
+    expect(access.rows.filter((row) => row.role !== 'service_role').every((row) => !row.can_read)).toBe(true);
+    expect(access.rows.filter((row) => row.role === 'service_role').every((row) => row.can_read)).toBe(true);
+    const after = await db.query<{ count: number }>('SELECT count(*)::int AS count FROM public.prompts');
+    expect(after.rows[0].count).toBe(before.rows[0].count);
+  });
 });

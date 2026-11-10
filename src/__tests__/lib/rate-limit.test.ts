@@ -8,6 +8,8 @@ beforeEach(() => {
   resetRateLimits();
   vi.stubEnv('UPSTASH_REDIS_REST_URL', '');
   vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '');
+  vi.stubEnv('KV_REST_API_URL', '');
+  vi.stubEnv('KV_REST_API_TOKEN', '');
   vi.stubEnv('VERCEL_ENV', '');
   vi.stubEnv('VERCEL', '');
 });
@@ -43,6 +45,19 @@ describe('Abuse protection', () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body[0]).toBe('EVAL');
     expect(body.slice(2)).toEqual([1, 'visitor', 60, 60_000]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the native Marketplace credentials without mixing incomplete credential pairs', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('KV_REST_API_URL', 'https://marketplace.example.com');
+    vi.stubEnv('KV_REST_API_TOKEN', 'marketplace-token');
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ result: [1, 0] })));
+    vi.stubGlobal('fetch', fetchMock);
+    expect((await consumeRules([{ key: 'visitor', limit: 60, windowMs: 60_000 }])).allowed).toBe(true);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://marketplace.example.com');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://explicit.example.com');
+    await expect(consumeRules([{ key: 'visitor', limit: 60, windowMs: 60_000 }])).rejects.toThrow(LimiterUnavailable);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
