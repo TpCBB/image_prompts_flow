@@ -5,7 +5,7 @@
   "workers_dev": true,
   "assets": {
     "directory": "../local_data/image-assets",
-    "html_handling": "none",
+    "html_handling": "auto-trailing-slash",
     "not_found_handling": "none"
   }
 }

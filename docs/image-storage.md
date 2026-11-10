@@ -12,6 +12,7 @@
 - 原始完整备份：`local_data/r2-backup-2026-11-10/`。
 - 图片名称及目录结构保持不变，数据库继续保存相对路径。
 - `image-hosting/_headers` 随图片复制到发布目录，设置一小时浏览器缓存。
+- `image-hosting/index.html` 是图片域名的说明首页，提供网站和示例图片入口。
 
 备份包含 1,050 张图片和 1 个文本文件。数据库中已有一条引用 `G6YNznVWoAEoBuQ`，原 R2 桶内不存在对应文件，迁移记录中保留了这项检查结果。
 
@@ -19,6 +20,7 @@
 
 ```bash
 cp image-hosting/_headers local_data/image-assets/_headers
+cp image-hosting/index.html local_data/image-assets/index.html
 npx --yes wrangler@4.159.0 deploy --config image-hosting/wrangler.jsonc
 ```
 

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Image Prompts · 图片资源</title>
+    <meta name="robots" content="noindex" />
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 28px; background: #f5f7fa; color: #17202e; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      main { width: 100%; max-width: 640px; padding: 40px; background: white; border: 1px solid #e6eaf0; border-radius: 22px; }
+      .status { display: inline-flex; align-items: center; gap: 8px; color: #187747; font-size: 14px; }
+      .status::before { content: ""; width: 8px; height: 8px; background: #28a267; border-radius: 50%; }
+      h1 { margin: 22px 0 14px; font-size: clamp(25px, 5vw, 34px); letter-spacing: -0.03em; }
+      p { margin: 12px 0; color: #667181; font-size: 15px; line-height: 1.8; }
+      .count { margin: 24px 0; padding: 18px 20px; background: #f7f9fc; border-radius: 12px; color: #344154; }
+      code { padding: 2px 6px; border-radius: 5px; background: #edf1f6; color: #344154; font-size: 13px; }
+      nav { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+      a { display: inline-block; padding: 11px 18px; border: 1px solid #dce3ed; border-radius: 9px; color: #2359bc; text-decoration: none; font-size: 14px; }
+      a.primary { background: #2463df; border-color: #2463df; color: white; }
+      a:hover { filter: brightness(0.95); }
+      a:focus-visible { outline: 3px solid #a2bfff; outline-offset: 3px; }
+      @media (max-width: 480px) { main { padding: 28px 22px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="status">图片服务已上线</span>
+      <h1>AI Image Prompts 图片资源</h1>
+      <p>这个域名用于提供提示词库中的图片。浏览和搜索提示词，请前往提示词库网站。</p>
+      <div class="count">已迁移 <strong>1,050 张图片</strong>，原文件名和目录结构保持不变。</div>
+      <p>单张图片可通过文件路径访问，例如 <code>/business_portrait.jpg</code>。</p>
+      <nav aria-label="访问入口">
+        <a class="primary" href="https://image-prompt-flow.vercel.app/">打开提示词库</a>
+        <a href="/business_portrait.jpg">查看示例图片</a>
+      </nav>
+    </main>
+  </body>
+</html>
