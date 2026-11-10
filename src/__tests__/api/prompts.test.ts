@@ -83,6 +83,7 @@ describe('Prompt API', () => {
     const detail = () => GET_DETAIL(request(''), { params: Promise.resolve({ id: '1' }) });
     const responses = await Promise.all(Array.from({ length: 20 }, detail));
     expect(responses.every((response) => response.status === 200)).toBe(true);
+    expect(await responses[0].json()).toMatchObject({ success: true, data: { id: 1, title: 'Example' } });
     expect(query.single).toHaveBeenCalledTimes(1);
     query.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
     for (let i = 0; i < 2; i++) {

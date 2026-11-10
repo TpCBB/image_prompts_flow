@@ -41,7 +41,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
       return { found: true as const, data: mapDbPromptToPrompt(data as DbPrompt) };
     });
-    return result.found ? successResponse(result.data) : ApiError.NOT_FOUND('提示词不存在');
+    return result.found ? successResponse({ data: result.data }) : ApiError.NOT_FOUND('提示词不存在');
   } catch (error) {
     return readErrorResponse(error);
   }
