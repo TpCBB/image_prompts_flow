@@ -23,8 +23,12 @@ yarn-debug.log*
 yarn-error.log*
 
 # Local env files
-.env*.local
-.env
+.env*
+*.env
+*.env.*
+!.env.local.example
+!*.env.example
+!*.env.sample
 
 # Vercel
 .vercel
@@ -37,6 +41,7 @@ next-env.d.ts
 
 # Cloudflare local deployment state
 .wrangler/
+/image-hosting/wrangler.*.local.jsonc
 
 # Local Supabase CLI state and browser review artifacts
 supabase/.temp/

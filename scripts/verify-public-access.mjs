@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 
-const site = new URL(process.argv[2] || process.env.SITE_URL || 'https://image-prompt-flow.vercel.app');
+const target = process.argv[2] || process.env.SITE_URL;
+assert(target, 'Provide an explicit site URL: npm run verify:access -- https://your-site.example');
+const site = new URL(target);
+assert(['http:', 'https:'].includes(site.protocol), 'The site URL must use HTTP or HTTPS');
 const database = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 assert(database && key, 'Provide the Supabase URL and an anonymous/publishable key; never use a service-role key');

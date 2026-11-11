@@ -16,7 +16,7 @@
 
 ## Vercel 上线顺序
 
-1. 配置 `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`。旧的 `NEXT_PUBLIC_SUPABASE_URL` 仍兼容，浏览器不再需要匿名密钥。
+1. 仅在 Production 配置 `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY` 和正式图片域名 `NEXT_PUBLIC_IMAGE_BASE_URL`。旧的 `NEXT_PUBLIC_SUPABASE_URL` 仍兼容，浏览器不再需要匿名密钥。Preview 只接受独立测试库的 `PREVIEW_SUPABASE_URL`、`PREVIEW_SUPABASE_SERVICE_ROLE_KEY`，未配置时停止构建，详见 `docs/environment-isolation.md`。
 2. 从 Vercel Marketplace 添加 Upstash Redis 可直接使用自动注入的 `KV_REST_API_URL`、`KV_REST_API_TOKEN`。也可手动配置完整的 `UPSTASH_REDIS_REST_URL`、`UPSTASH_REDIS_REST_TOKEN`；手动配置优先且必须成对提供。免费方案应关闭自动升级，确认服务条款的步骤由账号所有者完成。建议 Preview 用独立 Redis；计数键也按环境隔离。密钥不能加 `NEXT_PUBLIC_` 前缀。
 3. 部署并验证首页、筛选、搜索、详情。**Production 未配置共享 Redis 时，页面和 API 返回 503。** 本地与 Preview 未配置时用内存计数，仅适合开发验证。
 4. 新版本工作后，在该站点的 Supabase 数据库执行 `supabase/harden-public-access.sql`，取消 `prompts/categories/tags` 的匿名和普通用户直读权限。若数据库被其他网站共用，先核对它们是否依赖这些权限。
@@ -29,7 +29,7 @@ CLI 发布时先运行 `vercel deploy --dry --json` 核对文件列表。`.verce
 
 可先用 `vercel deploy --prod --skip-domain` 创建使用生产配置的独立部署，验证页面和 API 后再 `vercel promote` 切换正式域名。新版验证通过后应用 `supabase/migrations/` 中关闭匿名读取的迁移；原始表和记录保留。
 
-完成后执行 `npm run verify:access`，使用本地匿名 / publishable key 验证网站仍能展示数据、未授权写入被拒绝、四个数据库表 / 视图的直接读取均返回权限错误；随机搜索还会强制一次未缓存的数据库查询。脚本拒绝服务端管理密钥。受限网络下可用 `HTTPS_PROXY=http://127.0.0.1:7891 ACCESS_CHECK_TRANSPORT=curl npm run verify:access`，密钥只经进程标准输入传递。
+完成后执行 `npm run verify:access -- https://your-site.example`，使用本地匿名 / publishable key 验证网站仍能展示数据、未授权写入被拒绝、四个数据库表 / 视图的直接读取均返回权限错误；随机搜索还会强制一次未缓存的数据库查询。脚本拒绝服务端管理密钥。受限网络下可用 `HTTPS_PROXY=http://127.0.0.1:7891 ACCESS_CHECK_TRANSPORT=curl npm run verify:access -- https://your-site.example`，密钥只经进程标准输入传递。
 
 规则在 `src/middleware.ts` 中。Redis 使用一个原子 Lua 命令检查全部额度，实例扩容不会重置计数。Redis 故障会暂时影响可用性，这是避免故障期间无限查库的取舍。
 

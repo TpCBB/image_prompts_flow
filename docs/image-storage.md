@@ -2,7 +2,7 @@
 
 网站和图片单独发布。图片文件通过 Cloudflare Workers Static Assets 直接提供，不运行图片代理脚本，也不绑定 R2。
 
-图片服务地址：`https://image-prompts-flow-images.hsc28yo.workers.dev`。
+图片服务地址由各部署的 `NEXT_PUBLIC_IMAGE_BASE_URL` 指定。
 
 2026-11-10 已上传全部 1,051 个文件，并逐个读取线上内容，与原始备份的 SHA-256 和文件大小核对，全部一致。
 
@@ -27,15 +27,26 @@
 ```bash
 cp image-hosting/_headers local_data/image-assets/_headers
 cp image-hosting/index.html local_data/image-assets/index.html
-npx --yes wrangler@4.159.0 deploy --config image-hosting/wrangler.jsonc
 ```
 
-如需登录，使用 Wrangler 登录授权。配置中的 Cloudflare 目标账号是本次授权的 `hsc28yo@gmail.com`，与原 R2 账号不同。
+独立部署先修改示例配置，使用自己的 Worker 名称和账号：
+
+```bash
+npx wrangler deploy --config image-hosting/wrangler.jsonc
+```
+
+本项目正式发布只使用被忽略的私有配置，目标保持不变：
+
+```bash
+npx wrangler deploy --config image-hosting/wrangler.production.local.jsonc
+```
+
+如需登录，使用自己的 Cloudflare 账号完成 Wrangler 授权。示例配置不包含正式账号；正式配置在本地私有文件中保存，发布前核对目标账号和 Worker 名称。
 
 新增图片时，先将文件放入待发布目录，再完整发布这个目录。保留所有仍被网站引用的旧图片。
 
 ## 切换网站
 
-图片地址默认配置位于 `src/lib/config.ts`，可通过 `NEXT_PUBLIC_IMAGE_BASE_URL` 使用自定义域名（更改后重新构建网站）。新图片服务验证完成后再切换。完整 URL 会保持原样；第三方图片不使用本地缩略图清单。国内网络访问质量需用目标用户的实际网络验证。
+图片地址必须通过 `NEXT_PUBLIC_IMAGE_BASE_URL` 明确指定（更改后重新构建网站）；不配置时只读取本站同路径静态文件，不默认访问正式图片域名。新图片服务验证完成后再切换。完整 URL 会保持原样；第三方图片不使用本地缩略图清单。国内网络访问质量需用目标用户的实际网络验证。
 
 2026-11-10 按用户要求清空旧 R2 桶 `promptsimage` 的全部 1,051 个文件，并确认桶内已无文件。本地原始备份和 ZIP 保留。删除空桶时现有密钥返回 `AccessDenied`，需原 R2 账号的管理权限继续完成；R2 订阅和付款设置尚未更改。

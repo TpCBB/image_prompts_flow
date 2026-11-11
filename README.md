@@ -73,7 +73,17 @@ npm run build
 npm start
 ```
 
-`R2_*` 环境变量为图片上传工具预留，当前浏览页面不依赖它们。现有图片源配置在 `src/lib/config.ts`。
+`R2_*` 环境变量为图片上传工具预留，当前浏览页面不依赖它们。通过 `NEXT_PUBLIC_IMAGE_BASE_URL` 明确配置自己的静态图片服务；不配置时只访问本站同路径静态文件。
+
+### 正式环境与预览隔离
+
+Vercel 的 `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、管理令牌及正式 Redis 凭据只勾选 **Production**，不要同时勾选 Preview。浏览器不需要数据库密钥，历史 `NEXT_PUBLIC_SUPABASE_*` 配置也不要共享到 Preview。
+
+Preview 只读取 `PREVIEW_SUPABASE_URL` 和 `PREVIEW_SUPABASE_SERVICE_ROLE_KEY`，必须指向另一个测试数据库；缺少任一项时构建会明确失败，不会回退使用正式库。尚无独立测试库时保持 Preview 未配置即可，GitHub 检查仍使用假的本地构建配置。代码也会拒绝与同次部署的通用配置相同的数据库地址或管理密钥，但不能识别被单独复制且改名的正式凭据，因此仍须在平台上正确限定变量环境。
+
+预览需要图片时另配测试图片域名或本站静态文件。仓库中的 Cloudflare 配置使用示例 Worker 名称；正式账号与发布目标保存在被忽略的 `image-hosting/wrangler.production.local.jsonc` 中，发布时显式选择该文件。克隆项目不会获得 Cloudflare 授权，部署前仍须使用自己的账号登录。
+
+检查步骤与历史部署处理见 [环境隔离](docs/environment-isolation.md)。
 
 ## 许可
 

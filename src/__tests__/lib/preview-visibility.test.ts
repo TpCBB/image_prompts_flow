@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { getHiddenDuplicateIds } from '@/lib/preview-visibility';
-import { IMAGE_BASE_URL } from '@/lib/config';
+import { IMAGE_CANONICAL_BASE_URL } from '@/lib/config';
 
 describe('Duplicate preview visibility', () => {
   it('keeps exactly one stable representative regardless of row order', () => {
@@ -17,7 +17,7 @@ describe('Duplicate preview visibility', () => {
   it('groups relative paths and their full CDN URLs together', () => {
     expect(getHiddenDuplicateIds([
       { id: 1, preview: 'shared.jpg', prompt_type: 'image' },
-      { id: 2, preview: `${IMAGE_BASE_URL}/shared.jpg`, prompt_type: 'image' },
+      { id: 2, preview: `${IMAGE_CANONICAL_BASE_URL}/shared.jpg`, prompt_type: 'image' },
       { id: 3, preview: 'unique.jpg', prompt_type: 'image' },
     ])).toHaveLength(1);
   });

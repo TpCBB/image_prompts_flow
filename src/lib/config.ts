@@ -1,7 +1,9 @@
-// 图片 CDN 域名配置
-// 修改这里来切换图片源
+// Legacy identity used only by deterministic duplicate selection. Keep this in
+// sync with the SQL gallery migration; it is never a default request origin.
 export const IMAGE_CANONICAL_BASE_URL = 'https://image-prompts-flow-images.hsc28yo.workers.dev';
-export const IMAGE_BASE_URL = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || IMAGE_CANONICAL_BASE_URL).replace(/\/$/, '');
+// Each deployment opts into its own image host; an unconfigured copy uses only
+// its own public assets and cannot silently consume the production image host.
+export const IMAGE_BASE_URL = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || '').trim().replace(/\/+$/, '');
 
 // 获取完整图片 URL
 export function getImageUrl(imagePath: string | null | undefined): string {

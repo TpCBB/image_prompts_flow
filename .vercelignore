@@ -2,6 +2,9 @@
 .vercel
 .env
 .env.*
+*.env
+*.env.*
+**/wrangler.*.local.jsonc
 node_modules
 .next
 out
