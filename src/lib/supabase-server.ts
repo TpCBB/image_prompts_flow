@@ -1,5 +1,6 @@
 import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getServerDatabaseConfig } from './database-config';
 
 let adminClient: SupabaseClient | undefined;
 
@@ -7,9 +8,7 @@ let adminClient: SupabaseClient | undefined;
 // endpoints authorize ADMIN_API_TOKEN before executing any write.
 export function getSupabaseAdmin() {
   if (!adminClient) {
-    const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) throw new Error('Missing server-side Supabase configuration');
+    const { url, key } = getServerDatabaseConfig(process.env);
     adminClient = createClient(url, key, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
