@@ -50,7 +50,7 @@ const dbPromptMixedArbitrary = fc.record({
   created_at: fc.oneof(
     fc.constant(null), 
     fc.constant(undefined), 
-    fc.date({ min: new Date('2000-01-01'), max: new Date('2100-01-01') }).map(d => d.toISOString())
+    fc.date({ min: new Date('2000-01-01'), max: new Date('2100-01-01'), noInvalidDate: true }).map(d => d.toISOString())
   ),
   tags: fc.oneof(fc.constant(null), fc.constant(undefined), fc.array(fc.string())),
   prompt_type: fc.oneof(fc.constant(null), fc.constant(undefined), fc.constant('image'), fc.constant('functional')),

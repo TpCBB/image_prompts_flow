@@ -96,19 +96,53 @@ describe('Prompt browsing', () => {
     const nextPage = deferred<ReturnType<typeof response>>();
     get.mockReturnValueOnce(nextPage.promise);
     mount();
+    const initialCard = screen.getByText('Initial prompt');
+    const initialPage = initialCard.parentElement;
     const button = screen.getByRole('button', { name: '加载更多' });
     fireEvent.click(button);
     fireEvent.click(button);
     expect(get).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Initial prompt')).toBe(initialCard);
     await act(async () => {
-      nextPage.resolve({ ...response('Next page'), data: [prompt(1, 'Duplicate'), prompt(2, 'Next page')] });
+      nextPage.resolve({ ...response('Next page'), data: [prompt(1, 'Duplicate'), prompt(2, 'Next page'), prompt(2, 'Repeated in page')] });
     });
-    expect(screen.getByText('Initial prompt')).toBeInTheDocument();
-    expect(screen.getByText('Next page')).toBeInTheDocument();
+    expect(screen.getByText('Initial prompt')).toBe(initialCard);
+    expect(initialCard.parentElement).toBe(initialPage);
+    expect(initialPage?.children).toHaveLength(1);
+    const appendedPage = screen.getByText('Next page').parentElement;
+    expect(initialPage?.nextElementSibling).toBe(appendedPage);
+    expect(appendedPage?.children).toHaveLength(1);
     expect(screen.queryByText('Duplicate')).not.toBeInTheDocument();
+    expect(screen.queryByText('Repeated in page')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('EN'));
     expect(screen.getByText('Next page')).toBeInTheDocument();
     expect(get).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps earlier batches intact across multiple loads and resets them when filtering', async () => {
+    get.mockResolvedValueOnce({ ...response('Second page'), pagination: { ...pagination, page: 2, hasMore: true } });
+    mount();
+    const initialPage = screen.getByText('Initial prompt').parentElement;
+    fireEvent.click(screen.getByRole('button', { name: '加载更多' }));
+    const secondCard = await screen.findByText('Second page');
+    const secondPage = secondCard.parentElement;
+    get.mockResolvedValueOnce({ ...response('Last page'), data: [prompt(3, 'Last page')] });
+    fireEvent.click(screen.getByRole('button', { name: '加载更多' }));
+    const lastCard = await screen.findByText('Last page');
+    expect(screen.getByText('Initial prompt').parentElement).toBe(initialPage);
+    expect(screen.getByText('Second page')).toBe(secondCard);
+    expect(initialPage?.nextElementSibling).toBe(secondPage);
+    expect(secondPage?.nextElementSibling).toBe(lastCard.parentElement);
+    expect(get.mock.calls.map(([, options]) => options.params.page)).toEqual([2, 3]);
+    expect(screen.queryByRole('button', { name: '加载更多' })).not.toBeInTheDocument();
+
+    get.mockResolvedValueOnce(response('Filtered page'));
+    fireEvent.click(screen.getByRole('button', { name: '创意' }));
+    const filteredCard = await screen.findByText('Filtered page');
+    expect(filteredCard.parentElement?.parentElement?.children).toHaveLength(1);
+    expect(screen.queryByText('Initial prompt')).not.toBeInTheDocument();
+    expect(screen.queryByText('Second page')).not.toBeInTheDocument();
+    expect(screen.queryByText('Last page')).not.toBeInTheDocument();
   });
 
   it('shows a retry control instead of an empty result when a request fails', async () => {

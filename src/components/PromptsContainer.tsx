@@ -46,7 +46,9 @@ export default function PromptsContainer({
     () => initialPrompts.data.filter((prompt) => !isNsfwLabel(prompt.category)),
     [initialPrompts.data]
   );
-  const [prompts, setPrompts] = useState<Prompt[]>(filteredInitialPrompts);
+  // Each response owns its columns so pagination cannot rebalance earlier cards.
+  const [promptPages, setPromptPages] = useState<Prompt[][]>([filteredInitialPrompts]);
+  const prompts = useMemo(() => promptPages.flat(), [promptPages]);
   const [tags, setTags] = useState<Tag[]>(initialTags);
   const [categories, setCategories] = useState<string[]>(initialCategories);
   const [totalCount, setTotalCount] = useState(initialPrompts.pagination.total);
@@ -80,7 +82,7 @@ export default function PromptsContainer({
         requestId === requestIdRef.current && latestQueryKey.current === queryKey;
 
       if (!append) {
-        setPrompts([]);
+        setPromptPages([]);
         setTotalCount(0);
         setHasMore(false);
       }
@@ -105,12 +107,17 @@ export default function PromptsContainer({
 
         const data = response.data || [];
         if (append) {
-          setPrompts((previous) => {
-            const ids = new Set(previous.map((prompt) => prompt.id));
-            return [...previous, ...data.filter((prompt) => !ids.has(prompt.id))];
+          setPromptPages((previous) => {
+            const ids = new Set(previous.flat().map((prompt) => prompt.id));
+            const nextPage = data.filter((prompt) => {
+              if (ids.has(prompt.id)) return false;
+              ids.add(prompt.id);
+              return true;
+            });
+            return nextPage.length ? [...previous, nextPage] : previous;
           });
         } else {
-          setPrompts(data);
+          setPromptPages([data]);
         }
         setTotalCount(response.pagination?.total ?? 0);
         setHasMore(response.pagination?.hasMore ?? false);
@@ -172,7 +179,7 @@ export default function PromptsContainer({
 
   useEffect(() => {
     if (queryKey === initialQueryKey) {
-      setPrompts(filteredInitialPrompts);
+      setPromptPages([filteredInitialPrompts]);
       setTotalCount(initialPrompts.pagination.total);
       setHasMore(initialPrompts.pagination.hasMore);
       setPage(initialPrompts.pagination.page);
@@ -259,18 +266,23 @@ export default function PromptsContainer({
           </div>
         ) : prompts.length > 0 ? (
           <>
-            {/* Keep cards mounted during pagination and language changes. */}
-            <div
-              key={queryKey}
-              className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-5"
-            >
-              {prompts.map((prompt) => (
-                <PromptCard
-                  key={prompt.id}
-                  prompt={prompt}
-                  lang={lang}
-                  onClick={() => { setSelectedPrompt(prompt); updateBrowseState({ promptId: prompt.id }); }}
-                />
+            {/* Append whole batches below existing columns, keeping cards mounted. */}
+            <div key={queryKey} className="space-y-5">
+              {promptPages.map((promptPage, index) => (
+                <div
+                  key={index}
+                  data-prompt-page={index + 1}
+                  className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-5 flow-root"
+                >
+                  {promptPage.map((prompt) => (
+                    <PromptCard
+                      key={prompt.id}
+                      prompt={prompt}
+                      lang={lang}
+                      onClick={() => { setSelectedPrompt(prompt); updateBrowseState({ promptId: prompt.id }); }}
+                    />
+                  ))}
+                </div>
               ))}
             </div>
 
