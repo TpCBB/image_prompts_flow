@@ -6,6 +6,17 @@ import { ToastProvider } from '@/contexts/ToastContext';
 import type { Prompt } from '@/types';
 
 const { get } = vi.hoisted(() => ({ get: vi.fn() }));
+let onIntersection: IntersectionObserverCallback;
+class MockIntersectionObserver {
+  constructor(callback: IntersectionObserverCallback) { onIntersection = callback; }
+  observe() {}
+  disconnect() {}
+}
+vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
+function reachBottom() {
+  act(() => onIntersection([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver));
+}
+
 vi.mock('@/lib/api-client', () => ({ getApiClient: () => ({ get }) }));
 vi.mock('@/components/PromptCard', () => ({
   default: ({ prompt }: { prompt: Prompt }) => <h3>{prompt.title}</h3>,
@@ -98,9 +109,8 @@ describe('Prompt browsing', () => {
     mount();
     const initialCard = screen.getByText('Initial prompt');
     const initialPage = initialCard.parentElement;
-    const button = screen.getByRole('button', { name: '加载更多' });
-    fireEvent.click(button);
-    fireEvent.click(button);
+    reachBottom();
+    reachBottom();
     expect(get).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Initial prompt')).toBe(initialCard);
     await act(async () => {
@@ -109,9 +119,7 @@ describe('Prompt browsing', () => {
     expect(screen.getByText('Initial prompt')).toBe(initialCard);
     expect(initialCard.parentElement).toBe(initialPage);
     expect(initialPage?.children).toHaveLength(1);
-    const appendedPage = screen.getByText('Next page').parentElement;
-    expect(initialPage?.nextElementSibling).toBe(appendedPage);
-    expect(appendedPage?.children).toHaveLength(1);
+    expect(initialPage?.nextElementSibling).toBe(screen.getByText('Next page').parentElement);
     expect(screen.queryByText('Duplicate')).not.toBeInTheDocument();
     expect(screen.queryByText('Repeated in page')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('EN'));
@@ -123,11 +131,11 @@ describe('Prompt browsing', () => {
     get.mockResolvedValueOnce({ ...response('Second page'), pagination: { ...pagination, page: 2, hasMore: true } });
     mount();
     const initialPage = screen.getByText('Initial prompt').parentElement;
-    fireEvent.click(screen.getByRole('button', { name: '加载更多' }));
+    reachBottom();
     const secondCard = await screen.findByText('Second page');
     const secondPage = secondCard.parentElement;
     get.mockResolvedValueOnce({ ...response('Last page'), data: [prompt(3, 'Last page')] });
-    fireEvent.click(screen.getByRole('button', { name: '加载更多' }));
+    reachBottom();
     const lastCard = await screen.findByText('Last page');
     expect(screen.getByText('Initial prompt').parentElement).toBe(initialPage);
     expect(screen.getByText('Second page')).toBe(secondCard);
@@ -139,10 +147,25 @@ describe('Prompt browsing', () => {
     get.mockResolvedValueOnce(response('Filtered page'));
     fireEvent.click(screen.getByRole('button', { name: '创意' }));
     const filteredCard = await screen.findByText('Filtered page');
-    expect(filteredCard.parentElement?.parentElement?.children).toHaveLength(1);
+    expect(filteredCard.parentElement?.children).toHaveLength(1);
     expect(screen.queryByText('Initial prompt')).not.toBeInTheDocument();
     expect(screen.queryByText('Second page')).not.toBeInTheDocument();
     expect(screen.queryByText('Last page')).not.toBeInTheDocument();
+  });
+
+  it('stops automatic loading after an error and retries the same page on request', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    get.mockResolvedValueOnce({ success: false, error: 'Offline' });
+    mount();
+    reachBottom();
+    const retries = await screen.findAllByRole('button', { name: '重试' });
+    expect(screen.getByText('Initial prompt')).toBeInTheDocument();
+    expect(get).toHaveBeenCalledTimes(1);
+    get.mockResolvedValueOnce(response('Recovered page'));
+    fireEvent.click(retries[0]);
+    expect(await screen.findByText('Recovered page')).toBeInTheDocument();
+    expect(get.mock.calls.map(([, options]) => options.params.page)).toEqual([2, 2]);
+    error.mockRestore();
   });
 
   it('shows a retry control instead of an empty result when a request fails', async () => {

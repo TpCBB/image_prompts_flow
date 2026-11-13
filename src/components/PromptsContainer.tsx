@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useMemo,
   useRef,
+  useSyncExternalStore,
 } from "react";
 import Header from "@/components/Header";
 import TagFilter from "@/components/TagFilter";
@@ -22,6 +23,21 @@ import { useToast } from "@/contexts/ToastContext";
 import { isNsfwLabel } from "@/lib/content-visibility";
 import { useBrowseState } from '@/hooks/useBrowseState';
 import { DEFAULT_BROWSE_STATE, type BrowseState } from '@/lib/browse-state';
+
+// Match Tailwind's responsive column breakpoints while keeping each card in its column.
+function subscribeToViewport(callback: () => void) {
+  window.addEventListener("resize", callback);
+  return () => window.removeEventListener("resize", callback);
+}
+
+function getColumnCount() {
+  if (window.innerWidth >= 1280) return 4;
+  if (window.innerWidth >= 1024) return 3;
+  if (window.innerWidth >= 640) return 2;
+  return 1;
+}
+
+function getServerColumnCount() { return 1; }
 
 interface PromptsContainerProps {
   initialPrompts: PromptsResult;
@@ -46,9 +62,14 @@ export default function PromptsContainer({
     () => initialPrompts.data.filter((prompt) => !isNsfwLabel(prompt.category)),
     [initialPrompts.data]
   );
-  // Each response owns its columns so pagination cannot rebalance earlier cards.
   const [promptPages, setPromptPages] = useState<Prompt[][]>([filteredInitialPrompts]);
   const prompts = useMemo(() => promptPages.flat(), [promptPages]);
+  const columnCount = useSyncExternalStore(subscribeToViewport, getColumnCount, getServerColumnCount);
+  const columns = useMemo(() => {
+    const result: Prompt[][] = Array.from({ length: columnCount }, () => []);
+    prompts.forEach((prompt, index) => result[index % columnCount].push(prompt));
+    return result;
+  }, [prompts, columnCount]);
   const [tags, setTags] = useState<Tag[]>(initialTags);
   const [categories, setCategories] = useState<string[]>(initialCategories);
   const [totalCount, setTotalCount] = useState(initialPrompts.pagination.total);
@@ -57,6 +78,7 @@ export default function PromptsContainer({
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const requestRef = useRef<AbortController | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const requestIdRef = useRef(0);
   const queryKey = JSON.stringify([promptType, debouncedSearch, selectedCategory, selectedTag]);
   const initialQueryKey = JSON.stringify([initialBrowseState.promptType, initialBrowseState.search.trim(), initialBrowseState.category, initialBrowseState.tag]);
@@ -217,9 +239,18 @@ export default function PromptsContainer({
     updateBrowseState({ category: null, tag: null, promptType: nextType, promptId: null });
   };
 
-  const handleLoadMore = () => {
-    if (!loading && hasMore) void fetchPrompts(page + 1, true);
-  };
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || !hasMore || loading || loadError) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        void fetchPrompts(page + 1, true);
+      }
+    }, { rootMargin: "200px 0px" });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [fetchPrompts, hasMore, loading, loadError, page, prompts.length]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950">
@@ -266,15 +297,11 @@ export default function PromptsContainer({
           </div>
         ) : prompts.length > 0 ? (
           <>
-            {/* Append whole batches below existing columns, keeping cards mounted. */}
-            <div key={queryKey} className="space-y-5">
-              {promptPages.map((promptPage, index) => (
-                <div
-                  key={index}
-                  data-prompt-page={index + 1}
-                  className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-5 flow-root"
-                >
-                  {promptPage.map((prompt) => (
+            {/* Appending to each column keeps existing cards in place without page gaps. */}
+            <div key={queryKey} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 items-start">
+              {columns.map((column, index) => (
+                <div key={index} data-prompt-column={index + 1}>
+                  {column.map((prompt) => (
                     <PromptCard
                       key={prompt.id}
                       prompt={prompt}
@@ -286,25 +313,13 @@ export default function PromptsContainer({
               ))}
             </div>
 
-            {/* Load More Button */}
             {hasMore && (
-              <div className="flex justify-center py-12">
-                <button
-                  onClick={handleLoadMore}
-                  disabled={loading}
-                  className="glass-button px-8 py-3.5 rounded-2xl text-[14px] font-medium
-                            bg-white/70 dark:bg-white/10 backdrop-blur-xl
-                            text-gray-800 dark:text-white
-                            border border-white/50 dark:border-white/20
-                            shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_4px_20px_rgba(0,0,0,0.1)]
-                            hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_8px_30px_rgba(0,0,0,0.15)]
-                            hover:-translate-y-1 hover:bg-white/90 dark:hover:bg-white/20
-                            active:scale-[0.97]
-                            transition-all duration-300 ease-out
-                            disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? t.loading : t.loadMore}
-                </button>
+              <div ref={loadMoreRef} className="flex justify-center py-12 text-sm text-gray-500 dark:text-gray-400" aria-live="polite">
+                {loadError ? (
+                  <button onClick={() => { void fetchPrompts(page + 1, true); }} className="px-5 py-2 rounded-xl bg-gray-900 text-white dark:bg-white dark:text-gray-900">
+                    {t.retry}
+                  </button>
+                ) : loading ? t.loading : null}
               </div>
             )}
           </>
